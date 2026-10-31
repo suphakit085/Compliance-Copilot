@@ -1,0 +1,28 @@
+# Demo users for local development and the interview demo ONLY.
+# Passwords are test values; in production authentication is delegated to the bank's
+# SSO (OIDC / Azure AD) and roles come from the identity provider's group claims.
+users:
+  - username: somchai
+    display_name: สมชาย (พนักงานสาขา)
+    role: employee
+    department: retail
+    clearance: internal
+    password: demo-employee
+  - username: nida
+    display_name: นิดา (เจ้าหน้าที่ Compliance)
+    role: compliance_officer
+    department: compliance
+    clearance: confidential
+    password: demo-compliance
+  - username: kittipong
+    display_name: กิตติพงษ์ (ผู้ตรวจสอบภายใน)
+    role: auditor
+    department: internal_audit
+    clearance: confidential
+    password: demo-auditor
+  - username: admin
+    display_name: ผู้ดูแลระบบ
+    role: admin
+    department: it
+    clearance: restricted
+    password: demo-admin
