@@ -186,7 +186,8 @@ def answer_question(
     retrieval = retrieve(standalone, user, as_of, **(retrieval_overrides or {}))
     sources = [_source_out(i, c) for i, c in enumerate(retrieval.candidates, 1)]
     trace["retrieval"] = {"timings_ms": retrieval.timings_ms, "top_score": retrieval.top_score,
-                          "terms": retrieval.terms}
+                          "terms": retrieval.terms,
+                          "glossary_expansions": retrieval.expansions}
     base = dict(
         sources=sources, notices=retrieval.notices, standalone_question=standalone,
         as_of=as_of.isoformat(), pii_masked=dict(masked.found), guard_flags=guard.flags,

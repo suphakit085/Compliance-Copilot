@@ -25,7 +25,7 @@ from sqlalchemy import text
 from ..config import get_settings
 from ..db import engine
 from . import bm25, models
-from .text_index import explicit_references, query_terms
+from .text_index import expand_query, explicit_references, query_terms
 
 
 @dataclass
@@ -71,6 +71,7 @@ class RetrievalResult:
     timings_ms: dict[str, int] = field(default_factory=dict)
     notices: list[str] = field(default_factory=list)
     terms: list[str] = field(default_factory=list)
+    expansions: list[str] = field(default_factory=list)
 
     @property
     def top_score(self) -> float:
@@ -138,6 +139,7 @@ def retrieve(
     use_lexical: bool = True,
     use_refs: bool = True,
     use_rerank: bool = True,
+    use_glossary: bool = True,
     top_n: int | None = None,
     source_kind: str | None = None,
     doc_ids: list[str] | None = None,
@@ -161,12 +163,13 @@ def retrieve(
 
     pool: dict[str, Candidate] = {}
     ranked_lists: list[list[str]] = []
-    terms = query_terms(query)
+    search_query, expansions = expand_query(query) if use_glossary else (query, [])
+    terms = query_terms(search_query)
 
     with engine().connect() as conn:
         if use_dense:
             t0 = time.perf_counter()
-            qvec = models.embed_query(query)
+            qvec = models.embed_query(search_query)
             timings["embed_query"] = int((time.perf_counter() - t0) * 1000)
             t0 = time.perf_counter()
             conn.execute(text("SET LOCAL hnsw.ef_search = 200"))
@@ -239,7 +242,7 @@ def retrieve(
     if use_rerank and fused:
         t0 = time.perf_counter()
         head = fused[: s.rerank_candidates]
-        scores = models.rerank(query, [c.embed_text[:2000] for c in head])
+        scores = models.rerank(search_query, [c.embed_text[:2000] for c in head])
         for c, sc in zip(head, scores, strict=True):
             c.rerank_score = sc
         head.sort(key=lambda c: c.rerank_score or 0.0, reverse=True)
@@ -249,7 +252,7 @@ def retrieve(
     selected = fused[:top_n]
     return RetrievalResult(
         query=query, as_of=as_of, candidates=selected, timings_ms=timings,
-        notices=version_notices(selected, as_of), terms=terms,
+        notices=version_notices(selected, as_of), terms=terms, expansions=expansions,
     )
 
 

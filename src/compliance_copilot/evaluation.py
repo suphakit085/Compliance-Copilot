@@ -35,14 +35,15 @@ RESULTS = ROOT / "eval" / "results"
 
 ABLATIONS: list[tuple[str, dict[str, Any]]] = [
     ("A. Fixed-size chunks + vector only (baseline)",
-     {"strategy": "naive", "use_lexical": False, "use_refs": False, "use_rerank": False}),
+     {"strategy": "naive", "use_lexical": False, "use_refs": False, "use_rerank": False, "use_glossary": False}),
     ("B. Structure-aware chunks + vector only",
-     {"strategy": "structured", "use_lexical": False, "use_refs": False, "use_rerank": False}),
+     {"strategy": "structured", "use_lexical": False, "use_refs": False, "use_rerank": False, "use_glossary": False}),
     ("C. Structure-aware chunks + BM25 only",
-     {"strategy": "structured", "use_dense": False, "use_refs": False, "use_rerank": False}),
+     {"strategy": "structured", "use_dense": False, "use_refs": False, "use_rerank": False, "use_glossary": False}),
     ("D. Hybrid (vector + BM25 + references, RRF)",
-     {"strategy": "structured", "use_rerank": False}),
-    ("E. Hybrid + cross-encoder rerank (production)", {"strategy": "structured"}),
+     {"strategy": "structured", "use_rerank": False, "use_glossary": False}),
+    ("E. Hybrid + cross-encoder rerank", {"strategy": "structured", "use_glossary": False}),
+    ("F. E + domain glossary expansion (production)", {"strategy": "structured"}),
 ]
 ABSTAIN_CATEGORIES = {"out_of_scope", "unanswerable"}
 
@@ -118,7 +119,7 @@ def eval_retrieval(log=print) -> dict[str, Any]:
             if it in answerable:
                 for k, v in _rank_metrics(r.candidates, it["evidence"]).items():
                     agg[k].append(v)
-            if name.startswith("E."):
+            if name.startswith("F."):
                 production_scores[it["id"]] = r.top_score
         n_queries = sum(1 for it in items if it["expect"] != "block")
         row = {"config": name, **{k: round(statistics.mean(v), 3) for k, v in agg.items()},
@@ -204,7 +205,7 @@ def eval_end_to_end(limit: int | None = None, log=print) -> dict[str, Any]:
         log(f"{it['id']:8s} {expect:7s} -> {r.status:22s} ok={ok_behaviour} facts={facts_ok} leak={leak}")
 
     def mean(key: str, subset=None) -> float | None:
-        vals = [x[key] for x in (subset or rows) if x.get(key) is not None]
+        vals = [x[key] for x in (rows if subset is None else subset) if x.get(key) is not None]
         vals = [float(v) for v in vals]
         return round(statistics.mean(vals), 3) if vals else None
 
@@ -296,6 +297,13 @@ def render_markdown(ev: dict[str, Any]) -> str:
         for c in e2e["by_category"]:
             lines.append(f"| {c['category']} | {c['n']} | {c['behaviour_accuracy']} | "
                          f"{c['key_fact_accuracy']} | {c['citation_recall']} |")
+        lines += [
+            "",
+            "Notes: `citation_precision` counts a cited source as correct only if it contains a gold",
+            "evidence string, so legitimate extra citations (e.g. the internal policy cited next to the",
+            "law it implements) lower it; `quote_verification_rate` is the faithfulness measure - the",
+            "share of cited quotes found verbatim in the cited source.",
+        ]
         fails = [r for r in e2e["rows"] if not r["behaviour_ok"] or r["key_facts_ok"] is False or r["leak"]]
         if fails:
             lines += ["", "### Failures to review", ""]

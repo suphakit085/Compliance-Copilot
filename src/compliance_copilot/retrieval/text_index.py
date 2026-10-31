@@ -44,6 +44,26 @@ def query_terms(query: str) -> list[str]:
     return seen
 
 
+@lru_cache(maxsize=1)
+def _glossary() -> list[tuple[list[str], str]]:
+    import yaml
+
+    from ..config import get_settings
+
+    f = get_settings().data_dir / "glossary.yaml"
+    if not f.exists():
+        return []
+    data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+    return [([m.lower() for m in t["match"]], t["expand"]) for t in data.get("terms", [])]
+
+
+def expand_query(query: str) -> tuple[str, list[str]]:
+    """Append glossary expansions for colloquial terms (e.g. "ข้อมูลอ่อนไหว" -> มาตรา 26 wording)."""
+    q = query.lower()
+    hits = [exp for matches, exp in _glossary() if any(m in q for m in matches)]
+    return (f"{query} ({' '.join(hits)})" if hits else query), hits
+
+
 def explicit_references(query: str) -> list[tuple[str, str]]:
     """References such as "มาตรา 37" or "ข้อ 2.3.2" typed by the user."""
     return [(m.group(1), m.group(2)) for m in _REF.finditer(normalize_text(query))]
