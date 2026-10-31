@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, History, Loader2, Quote, Scale, ShieldCheck } from "lucide-react";
+import { DemoCard } from "@/components/login/demo-card";
 
 const DEMO = [
   { username: "somchai", label: "พนักงานสาขา", hint: "ระดับภายใน" },
@@ -11,17 +12,30 @@ const DEMO = [
 ];
 
 const FEATURES = [
-  { icon: Quote, title: "อ้างอิงที่ตรวจสอบได้", body: "ทุกประโยคอ้างถึงมาตรา/ข้อ และระบบตรวจข้อความที่อ้างกับต้นฉบับทุกครั้ง" },
-  { icon: ShieldCheck, title: "สิทธิ์และความเป็นส่วนตัว", body: "เห็นเฉพาะเอกสารที่มีสิทธิ์ ปิดบังข้อมูลส่วนบุคคลก่อนส่งให้ AI" },
-  { icon: History, title: "รู้ว่ากฎฉบับไหนมีผล", body: "ตอบตามฉบับที่มีผล ณ วันที่เลือก พร้อม audit trail แบบ hash chain" },
+  { icon: Quote, title: "อ้างอิงที่ตรวจสอบได้", body: "ตรวจข้อความที่อ้างกับต้นฉบับทุกครั้ง" },
+  { icon: ShieldCheck, title: "สิทธิ์และความเป็นส่วนตัว", body: "เห็นเฉพาะที่มีสิทธิ์ ปิดบัง PII ก่อนส่ง AI" },
+  { icon: History, title: "รู้ว่ากฎฉบับไหนมีผล", body: "ตอบตามฉบับที่มีผล ณ วันที่เลือก" },
 ];
+
+/** Inline style helper for staggered entrance delays. */
+const d = (ms: number) => ({ ["--d" as string]: `${ms}ms` });
 
 export default function LoginPage() {
   const router = useRouter();
+  const root = useRef<HTMLDivElement>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(0);
+
+  function onMove(e: React.MouseEvent) {
+    const el = root.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    el.style.setProperty("--my", `${e.clientY - r.top}px`);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,9 +46,10 @@ export default function LoginPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-    setLoading(false);
     if (!res.ok) {
+      setLoading(false);
       setError((await res.json()).detail ?? "เข้าสู่ระบบไม่สำเร็จ");
+      setShake((n) => n + 1);
       return;
     }
     router.replace("/");
@@ -42,90 +57,111 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
-      <div className="aurora pointer-events-none absolute inset-0" />
-      <div className="hairline-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(70%_60%_at_50%_0%,black,transparent)]" />
+    <div ref={root} onMouseMove={onMove} className="relative min-h-screen overflow-hidden bg-background">
+      {/* animated backdrop */}
+      <div className="aurora-blob a" />
+      <div className="aurora-blob b" />
+      <div className="aurora-blob c" />
+      <div className="hairline-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(75%_65%_at_50%_10%,black,transparent)]" />
+      <div className="spotlight pointer-events-none absolute inset-0" />
 
-      <header className="relative flex items-center justify-between px-8 py-6">
+      <header className="enter relative flex items-center justify-between px-8 py-6" style={d(0)}>
         <div className="flex items-center gap-2.5 text-[15px] font-semibold">
-          <Scale className="size-5" /> Compliance Copilot
+          <span className="flex size-7 items-center justify-center rounded-lg bg-foreground text-background">
+            <Scale className="size-4" />
+          </span>
+          Compliance Copilot
         </div>
         <span className="text-sm text-muted-foreground">Thai Banking & Securities</span>
       </header>
 
-      <main className="relative mx-auto grid max-w-6xl items-center gap-16 px-8 pb-16 pt-10 lg:grid-cols-[1.15fr_1fr] lg:pt-20">
+      <main className="relative mx-auto grid max-w-6xl items-center gap-14 px-8 pb-16 pt-6 lg:grid-cols-[1.15fr_1fr] lg:pt-12">
         <section>
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-card/60 px-3 py-1 text-xs text-muted-foreground backdrop-blur">
-            <span className="size-1.5 rounded-full bg-brand shadow-[0_0_8px_#0099ff]" />
+          <div className="enter mb-6 inline-flex items-center gap-2 rounded-full border bg-card/60 px-3 py-1 text-xs text-muted-foreground backdrop-blur" style={d(80)}>
+            <span className="pulse-ring size-1.5 rounded-full bg-brand" />
             PDPA · AMLA · กฎกระทรวง CDD · ธปท. · ก.ล.ต.
           </div>
           <h1 className="text-4xl font-semibold leading-[1.15] tracking-tight sm:text-5xl xl:text-[56px]">
-            <span className="whitespace-nowrap">คำตอบด้าน Compliance</span>
-            <br />
-            <span className="whitespace-nowrap bg-gradient-to-r from-[#0099ff] via-[#5cc4ff] to-[#a78bfa] bg-clip-text text-transparent">
-              ที่ตรวจสอบได้ทุกประโยค
+            <span className="enter block whitespace-nowrap" style={d(160)}>คำตอบด้าน Compliance</span>
+            <span className="enter block whitespace-nowrap" style={d(260)}>
+              <span className="text-shimmer">ที่ตรวจสอบได้ทุกประโยค</span>
             </span>
           </h1>
-          <p className="mt-6 max-w-xl text-lg text-muted-foreground">
+          <p className="enter mt-5 max-w-xl text-lg text-muted-foreground" style={d(360)}>
             ผู้ช่วย AI สำหรับทีมกำกับการปฏิบัติงาน — ค้นกฎหมาย ประกาศหน่วยงานกำกับ และนโยบายภายใน
             แล้วตอบพร้อมหลักฐานจากต้นฉบับ
           </p>
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="panel p-4">
-                <f.icon className="mb-3 size-5 text-brand" />
-                <div className="text-sm font-medium">{f.title}</div>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{f.body}</p>
+          <div className="enter mt-8 max-w-xl" style={d(480)}>
+            <DemoCard />
+          </div>
+          <div className="mt-6 grid max-w-xl gap-3 sm:grid-cols-3">
+            {FEATURES.map((f, k) => (
+              <div key={f.title} className="enter" style={d(600 + k * 90)}>
+                <div className="lift panel h-full p-3.5">
+                  <f.icon className="mb-2 size-4 text-brand" />
+                  <div className="text-[13px] font-medium">{f.title}</div>
+                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">{f.body}</p>
+                </div>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="glow-shell p-7">
-          <h2 className="text-xl font-semibold">เข้าสู่ระบบ</h2>
-          <p className="mt-1 text-sm text-muted-foreground">ใช้บัญชีพนักงานของธนาคาร</p>
-          <form onSubmit={submit} className="mt-6 space-y-3">
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="ชื่อผู้ใช้"
-              autoComplete="username"
-              className="h-11 w-full rounded-[10px] border bg-background/60 px-3.5 text-sm outline-none transition placeholder:text-muted-foreground focus:border-brand/60 focus:ring-2 focus:ring-brand/20"
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="รหัสผ่าน"
-              autoComplete="current-password"
-              className="h-11 w-full rounded-[10px] border bg-background/60 px-3.5 text-sm outline-none transition placeholder:text-muted-foreground focus:border-brand/60 focus:ring-2 focus:ring-brand/20"
-            />
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading || !username || !password}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-foreground text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-40"
-            >
-              {loading ? <Loader2 className="size-4 animate-spin" /> : <>เข้าสู่ระบบ <ArrowRight className="size-4" /></>}
-            </button>
-          </form>
-          <div className="mt-7 border-t pt-5">
-            <p className="mb-2 text-xs text-muted-foreground">บัญชีทดลอง · รหัสผ่านอยู่ใน config/users.yaml</p>
-            <div className="grid gap-1">
-              {DEMO.map((d) => (
+        <section className="enter" style={d(300)}>
+          <div key={shake} className={shake ? "animate-[shake_0.4s_ease-in-out]" : undefined}>
+            <div className="glow-shell border-spin p-7">
+              <h2 className="text-xl font-semibold">เข้าสู่ระบบ</h2>
+              <p className="mt-1 text-sm text-muted-foreground">ใช้บัญชีพนักงานของธนาคาร</p>
+              <form onSubmit={submit} className="mt-6 space-y-3">
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="ชื่อผู้ใช้"
+                  autoComplete="username"
+                  className="h-11 w-full rounded-[10px] border bg-background/60 px-3.5 text-sm outline-none transition placeholder:text-muted-foreground focus:border-brand/60 focus:ring-2 focus:ring-brand/20"
+                />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="รหัสผ่าน"
+                  autoComplete="current-password"
+                  className="h-11 w-full rounded-[10px] border bg-background/60 px-3.5 text-sm outline-none transition placeholder:text-muted-foreground focus:border-brand/60 focus:ring-2 focus:ring-brand/20"
+                />
+                {error && <p className="pop-in text-sm text-destructive">{error}</p>}
                 <button
-                  key={d.username}
-                  type="button"
-                  onClick={() => setUsername(d.username)}
-                  className="flex items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition hover:bg-white/5"
+                  type="submit"
+                  disabled={loading || !username || !password}
+                  className="group flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-foreground text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-40"
                 >
-                  <span>
-                    <span className="font-medium">{d.username}</span>
-                    <span className="text-muted-foreground"> · {d.label}</span>
-                  </span>
-                  <span className="text-xs text-muted-foreground">{d.hint}</span>
+                  {loading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <>
+                      เข้าสู่ระบบ <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                    </>
+                  )}
                 </button>
-              ))}
+              </form>
+              <div className="mt-7 border-t pt-5">
+                <p className="mb-2 text-xs text-muted-foreground">บัญชีทดลอง · รหัสผ่านอยู่ใน config/users.yaml</p>
+                <div className="grid gap-1">
+                  {DEMO.map((u) => (
+                    <button
+                      key={u.username}
+                      type="button"
+                      onClick={() => setUsername(u.username)}
+                      className="flex items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition hover:bg-white/5"
+                    >
+                      <span>
+                        <span className="font-medium">{u.username}</span>
+                        <span className="text-muted-foreground"> · {u.label}</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">{u.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>
