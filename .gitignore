@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Secrets & local tooling
+.env
+.scratch/
+
+# Data: raw PDFs are re-downloadable (`copilot fetch`, pinned by sha256 in manifest.lock.json);
+# OCR transcriptions are kept so a fresh clone does not need an LLM to rebuild the corpus.
+data/raw/*.pdf
+data/processed/*
+!data/processed/ocr/
+
+# Eval: keep the latest results, not every run
+eval/results/eval-*.json

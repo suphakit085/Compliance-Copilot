@@ -1,0 +1,65 @@
+[project]
+name = "compliance-copilot"
+version = "0.1.0"
+description = "Trustworthy RAG assistant for Thai banking & securities compliance teams"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "anthropic>=0.60",
+    "beautifulsoup4>=4.12",
+    "fastapi>=0.115",
+    "google-genai>=1.0",
+    "httpx>=0.27",
+    "openpyxl>=3.1",
+    "pandas>=2.2",
+    "pgvector>=0.3",
+    "psycopg[binary]>=3.2",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "pyjwt>=2.9",
+    "pymupdf>=1.24",
+    "pythainlp>=5.0",
+    "pyyaml>=6.0",
+    "rich>=13.7",
+    "sentence-transformers>=3.0",
+    "torch>=2.6",
+    "sqlalchemy>=2.0",
+    "typer>=0.12",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.scripts]
+copilot = "compliance_copilot.cli:app"
+
+[dependency-groups]
+dev = ["pytest>=8.3", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/compliance_copilot"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["integration: needs Postgres and models"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+# Thai prompt and regulation strings are long by nature; line length is left to review.
+ignore = ["E501"]
+
+# CUDA build of PyTorch on Windows/Linux (falls back to CPU at runtime when no GPU is present).
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu130", marker = "sys_platform == 'win32' or sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
