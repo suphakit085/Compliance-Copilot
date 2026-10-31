@@ -1,0 +1,147 @@
+# Public regulatory corpus (Thai banking & securities compliance).
+#
+# Each entry is fetched by `copilot fetch` into data/raw/<id>.pdf and pinned in
+# data/raw/manifest.lock.json (sha256 + retrieved_at) for provenance.
+#
+# `url` is where we download from. When the official host (ราชกิจจานุเบกษา, ก.ล.ต.)
+# blocks automated clients we use a reputable mirror and keep the official
+# reference in `official_ref` / `official_url` so users can verify against the source.
+#
+# Thai law texts, ministerial regulations and regulator notifications are not
+# copyright works (พ.ร.บ.ลิขสิทธิ์ พ.ศ. 2537 มาตรา 7).
+
+documents:
+  - id: pdpa-2562
+    title: พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
+    short_title: พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล 2562 (PDPA)
+    doc_type: act
+    issuer: รัฐสภา
+    regulator: สำนักงานคณะกรรมการคุ้มครองข้อมูลส่วนบุคคล (สคส.)
+    topics: [pdpa, data-protection]
+    sectors: [banking, securities]
+    url: https://www.ocs.go.th/searchlaw/power_link/download/eyJ1dWlkIjoiMTc5NmU0ZjQtZTgxNi00ODgxLTg1ZWEtYTU4OWI2NjRjZTdhIiwiZmlsZW5hbWUiOiLguIQwMTM2IOC4nuC4o-C4sOC4o-C4suC4iuC4muC4seC4jeC4jeC4seC4leC4tCAyNTYyLTY54LiBLTUyLlBERiJ9.jZ8Egjp9J2zvIyWGwH-Ybn87GnkibJawbe4dDpKCfls
+    source_name: สำนักงานคณะกรรมการกฤษฎีกา (ocs.go.th)
+    official_ref: ราชกิจจานุเบกษา เล่ม 136 ตอนที่ 69 ก หน้า 52 (27 พฤษภาคม 2562)
+    official_url: https://www.ratchakitcha.soc.go.th/DATA/PDF/2562/A/069/T_0052.PDF
+    published_on: 2019-05-27
+    # หมวด 2, 3, 5, 6, 7 และมาตรา 95-96 มีผลใช้บังคับเต็มรูปแบบ 1 มิ.ย. 2565 หลังเลื่อนผ่านพระราชกฤษฎีกา
+    effective_from: 2022-06-01
+    aliases: [PDPA, พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล, พรบ คุ้มครองข้อมูล, กฎหมายคุ้มครองข้อมูลส่วนบุคคล]
+
+  - id: pdpc-breach-2565
+    title: ประกาศคณะกรรมการคุ้มครองข้อมูลส่วนบุคคล เรื่อง หลักเกณฑ์และวิธีการในการแจ้งเหตุการละเมิดข้อมูลส่วนบุคคล พ.ศ. 2565
+    short_title: ประกาศ กคส. เรื่องการแจ้งเหตุละเมิดข้อมูลส่วนบุคคล 2565
+    doc_type: notification
+    issuer: คณะกรรมการคุ้มครองข้อมูลส่วนบุคคล
+    regulator: สำนักงานคณะกรรมการคุ้มครองข้อมูลส่วนบุคคล (สคส.)
+    topics: [pdpa, data-breach]
+    sectors: [banking, securities]
+    url: https://db.legal.tu.ac.th/wp-content/uploads/2025/05/PDPC_Notification_Data_Breach_Reporting_Criteria_B.E._2565.pdf
+    source_name: คณะนิติศาสตร์ มหาวิทยาลัยธรรมศาสตร์ (mirror)
+    official_ref: ราชกิจจานุเบกษา เล่ม 139 ตอนพิเศษ 292 ง หน้า 7 (15 ธันวาคม 2565)
+    official_url: https://www.ratchakitcha.soc.go.th/DATA/PDF/2565/E/292/T_0007.PDF
+    published_on: 2022-12-15
+    effective_from: 2022-12-15
+    aliases: [แจ้งเหตุละเมิด, data breach, ประกาศแจ้งเหตุการละเมิด]
+
+  - id: amla-2542
+    title: พระราชบัญญัติป้องกันและปราบปรามการฟอกเงิน พ.ศ. 2542 (ฉบับประมวล)
+    short_title: พ.ร.บ.ป้องกันและปราบปรามการฟอกเงิน 2542 (AMLA)
+    doc_type: act
+    issuer: รัฐสภา
+    regulator: สำนักงานป้องกันและปราบปรามการฟอกเงิน (ปปง.)
+    topics: [aml, kyc]
+    sectors: [banking, securities]
+    url: https://sed.amlo.go.th/uploads/tiny/Law%20and%20regulaiton/Act/AMLA%20Act.pdf
+    source_name: กองกำกับและตรวจสอบ สำนักงาน ปปง. (sed.amlo.go.th)
+    official_ref: ราชกิจจานุเบกษา เล่ม 116 ตอนที่ 29 ก (21 เมษายน 2542) และฉบับแก้ไขเพิ่มเติม
+    official_url: https://sed.amlo.go.th/content/detail/107
+    published_on: 1999-04-21
+    effective_from: 1999-08-19
+    aliases: [AMLA, พ.ร.บ.ฟอกเงิน, พรบ ฟอกเงิน, กฎหมายฟอกเงิน, ป้องกันและปราบปรามการฟอกเงิน]
+
+  - id: cdd-2563
+    title: กฎกระทรวงการตรวจสอบเพื่อทราบข้อเท็จจริงเกี่ยวกับลูกค้า พ.ศ. 2563
+    short_title: กฎกระทรวง CDD 2563
+    doc_type: ministerial_regulation
+    issuer: กระทรวงยุติธรรม
+    regulator: สำนักงานป้องกันและปราบปรามการฟอกเงิน (ปปง.)
+    topics: [aml, kyc, cdd]
+    sectors: [banking, securities]
+    url: https://sed.amlo.go.th/content/download/221
+    source_name: กองกำกับและตรวจสอบ สำนักงาน ปปง. (sed.amlo.go.th)
+    official_ref: ราชกิจจานุเบกษา (14 พฤษภาคม 2563)
+    official_url: https://sed.amlo.go.th/content/detail/221
+    published_on: 2020-05-14
+    effective_from: 2020-08-12
+    aliases: [CDD, KYC, กฎกระทรวง CDD, การตรวจสอบเพื่อทราบข้อเท็จจริงเกี่ยวกับลูกค้า]
+
+  - id: bot-responsible-lending-2566
+    title: ประกาศธนาคารแห่งประเทศไทย เรื่อง การให้สินเชื่ออย่างรับผิดชอบและเป็นธรรม (Responsible Lending)
+    short_title: ประกาศ ธปท. Responsible Lending 2566
+    doc_type: notification
+    issuer: ธนาคารแห่งประเทศไทย
+    regulator: ธนาคารแห่งประเทศไทย (ธปท.)
+    topics: [market-conduct, lending, consumer-protection]
+    sectors: [banking]
+    url: https://www.bot.or.th/content/dam/bot/fipcs/documents/FPG/2566/ThaiPDF/25660239.pdf
+    source_name: ธนาคารแห่งประเทศไทย (bot.or.th)
+    official_ref: หนังสือเวียน ธปท. ลงวันที่ 28 ธันวาคม 2566
+    official_url: https://www.bot.or.th/content/dam/bot/fipcs/documents/FPG/2566/ThaiPDF/25660239.pdf
+    published_on: 2023-12-28
+    effective_from: 2024-01-01
+    aliases: [Responsible Lending, สกช. 7/2566, การให้สินเชื่ออย่างรับผิดชอบ, RL]
+
+  - id: bot-amlo-sanctions-jps-2567
+    title: Joint Policy Statement ธนาคารแห่งประเทศไทยและสำนักงาน ปปง. เรื่อง การบริหารความเสี่ยงด้าน Sanctions
+    short_title: JPS ธปท.-ปปง. ด้าน Sanctions 2567
+    doc_type: circular
+    issuer: ธนาคารแห่งประเทศไทย และ สำนักงาน ปปง.
+    regulator: ธนาคารแห่งประเทศไทย (ธปท.)
+    topics: [aml, sanctions]
+    sectors: [banking]
+    url: https://www.bot.or.th/content/dam/bot/fipcs/documents/FPG/2567/ThaiPDF/25670220.pdf
+    source_name: ธนาคารแห่งประเทศไทย (bot.or.th)
+    official_ref: หนังสือเวียน ธปท.ว. 3090/2567 ลงวันที่ 27 ธันวาคม 2567
+    official_url: https://www.bot.or.th/content/dam/bot/fipcs/documents/FPG/2567/ThaiPDF/25670220.pdf
+    published_on: 2024-12-27
+    effective_from: 2024-12-27
+    aliases: [sanctions, คว่ำบาตร, Joint Policy Statement, JPS]
+
+  - id: sec-tt-35-2556
+    title: ประกาศคณะกรรมการกำกับตลาดทุน ที่ ทธ. 35/2556 เรื่อง มาตรฐานการประกอบธุรกิจ โครงสร้างการบริหารงาน ระบบงาน และการให้บริการของผู้ประกอบธุรกิจหลักทรัพย์และผู้ประกอบธุรกิจสัญญาซื้อขายล่วงหน้า (ฉบับประมวล)
+    short_title: ประกาศ ทธ. 35/2556 (มาตรฐานการประกอบธุรกิจหลักทรัพย์)
+    doc_type: notification
+    issuer: คณะกรรมการกำกับตลาดทุน
+    regulator: สำนักงานคณะกรรมการกำกับหลักทรัพย์และตลาดหลักทรัพย์ (ก.ล.ต.)
+    topics: [securities-conduct, suitability, conflict-of-interest, outsourcing]
+    sectors: [securities]
+    url: https://www.thaibma.or.th/pdf/Convention/doc/1_35_2556.pdf
+    source_name: สมาคมตลาดตราสารหนี้ไทย (thaibma.or.th, mirror)
+    official_ref: ประกาศคณะกรรมการกำกับตลาดทุน ที่ ทธ. 35/2556 ลงวันที่ 6 กันยายน 2556 (ฉบับประมวล)
+    official_url: https://law.sec.or.th/content/495/750/9
+    published_on: 2013-09-06
+    effective_from: 2014-04-01
+    consolidated_through: ทธ. 23/2565
+    aliases: [ทธ. 35/2556, ทธ.35/2556, มาตรฐานการประกอบธุรกิจหลักทรัพย์]
+    amended_by:
+      - ref: ประกาศคณะกรรมการกำกับตลาดทุน ที่ ทธ. 53/2568
+        effective_from: 2026-04-01
+        note: ยกระดับหลักเกณฑ์มาตรฐานการประกอบธุรกิจด้วยความรับผิดชอบ - ฉบับประมวลนี้ยังไม่รวมการแก้ไขดังกล่าว (ดูหนังสือเวียน กลต.นป.(ว) 50/2568)
+        source_doc: sec-outsourcing-circular-2568
+
+  - id: sec-outsourcing-circular-2568
+    title: หนังสือเวียน ที่ กลต.นป.(ว) 50/2568 เรื่อง นำส่งภาพถ่ายประกาศและซักซ้อมความเข้าใจเกี่ยวกับการยกระดับหลักเกณฑ์มาตรฐานการประกอบธุรกิจด้วยความรับผิดชอบ และการปรับปรุงหลักเกณฑ์กำกับดูแลการเปลี่ยนแปลงธุรกิจของผู้ประกอบธุรกิจหลักทรัพย์และผู้ประกอบธุรกิจสัญญาซื้อขายล่วงหน้า
+    short_title: หนังสือเวียน ก.ล.ต. ที่ กลต.นป.(ว) 50/2568 (Responsible Business / การเปลี่ยนแปลงธุรกิจ)
+    doc_type: circular
+    issuer: สำนักงานคณะกรรมการกำกับหลักทรัพย์และตลาดหลักทรัพย์
+    regulator: สำนักงานคณะกรรมการกำกับหลักทรัพย์และตลาดหลักทรัพย์ (ก.ล.ต.)
+    topics: [securities-conduct, responsible-business, business-change-reporting]
+    sectors: [securities]
+    url: https://www.thaibma.or.th/pdf/Convention/doc/1_35_2556-25-01.pdf
+    source_name: สมาคมตลาดตราสารหนี้ไทย (thaibma.or.th, mirror)
+    official_ref: หนังสือเวียน ที่ กลต.นป.(ว) 50/2568 ลงวันที่ 26 ธันวาคม 2568
+    official_url: https://www.sec.or.th
+    published_on: 2025-12-26
+    effective_from: 2026-04-01
+    aliases: [กลต.นป.(ว) 50/2568, ทธ. 53/2568, Responsible Business, E-SUBMISSION]
