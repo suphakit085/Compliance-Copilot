@@ -1,0 +1,116 @@
+# Architecture & design decisions
+
+## 1. Request lifecycle
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant N as Next.js (BFF)
+  participant A as FastAPI
+  participant P as Postgres + pgvector
+  participant M as Local models (BGE-M3, reranker)
+  participant L as LLM (Gemini)
+
+  B->>N: POST /api/backend/chat (cookie)
+  N->>A: POST /chat (Bearer token from httpOnly cookie)
+  A->>A: injection screen · PII mask
+  A->>L: condense follow-up (only if multi-turn, masked text)
+  A->>M: embed query
+  A->>P: dense + BM25 candidates  WHERE clearance/department/effective-date
+  A->>M: cross-encoder rerank
+  alt best score < threshold
+    A-->>N: insufficient_evidence (no LLM call)
+  else
+    A->>L: SOURCES + question → JSON {answer with [S#], citations with verbatim quotes}
+    A->>A: verify every quote against its source text
+  end
+  A->>P: append hash-chained audit record
+  A-->>N: answer + sources + grounding stats
+  N-->>B: JSON
+```
+
+## 2. Data model
+
+| Table | Purpose |
+|---|---|
+| `documents` | One row per document version: classification, departments, effective_from/to, supersedes/superseded_by, amended_by, provenance (source URL, official reference, SHA-256), extraction quality |
+| `chunks` | Citable units (มาตรา/ข้อ) with breadcrumb path, amendment notes, page span, `embedding vector(1024)` (HNSW), `tokens_text` + generated `tsvector`, `strategy` (structured / naive for ablation) |
+| `users` | Demo identities: role, department, clearance (scrypt password hashes) |
+| `audit_log` | Append-only events with `prev_hash` / `hash` (SHA-256 chain) |
+| `feedback` | 👍/👎 per audited answer |
+
+## 3. Key decisions
+
+### Structure-aware chunking over fixed windows
+Legal text is cited by มาตรา/ข้อ, and a fixed 1,000-character window routinely splits a
+provision or merges two. The parser recognises หมวด / ส่วน / มาตรา / ข้อ and outline numbering
+(5.3.1, เอกสารแนบ N), validating each heading as a *successor* of the previous number so a
+wrapped line that happens to start with "มาตรา 95 และ…" is not mistaken for a heading.
+Measured effect: Hit@6 0.575 → 0.900.
+
+### Hybrid retrieval with BM25 computed in Python
+Thai legal questions mix paraphrase ("ข้อมูลรั่ว") with exact terms ("มาตรา 22/1", "CDD").
+Dense retrieval handles the first; lexical handles the second. Postgres FTS gives us
+filtering and a GIN prefilter, but `ts_rank` has no IDF, so BM25 is computed over the
+prefiltered rows with document frequencies cached from the corpus. Explicit references
+("PDPA มาตรา 26") are looked up directly. Results are fused with Reciprocal Rank Fusion.
+
+### Access control inside the retrieval query
+The ACL predicate (`classification_level <= clearance AND (departments = [] OR department ∈
+departments)`) and the effective-date predicate are part of every first-stage SQL query.
+Consequences: restricted text cannot reach the reranker, the prompt, the answer or the
+audit log; and there is one place to review. Next step: Postgres row-level security as a
+second, independent layer.
+
+### Verify citations in code, not by trusting the model
+The model returns `{answer, citations: [{source_id, quote}]}`. Each quote must be found in
+the cited source (exact, whitespace-insensitive for Thai, or ≥ 85% contiguous match).
+Unverifiable citations are dropped and their markers rendered red; if nothing verifies,
+the user sees the source passages instead of the generated text. This works with any LLM
+(Gemini, Claude, an on-prem model) and turns "faithfulness" into a deterministic metric.
+
+### Abstain before generating
+If the best reranker score is below a threshold calibrated on the golden set, the system
+answers "insufficient evidence" without calling the LLM — cheaper, faster, and nothing to
+hallucinate from. Calibration: answerable ≥ 0.24, out-of-corpus ≤ 0.008, threshold 0.15.
+
+### Versioned documents, not overwritten ones
+Policies have `effective_from/to`; superseded versions stay in the corpus. Questions are
+answered "as of" a date (default today), which also lets compliance officers reconstruct
+what the rule was when an incident happened. Consolidated regulations carry `amended_by`
+entries so pending amendments are surfaced as warnings.
+
+### Tamper-evident audit
+`hash = sha256(prev_hash ‖ canonical_json(record))`, writers serialised with a
+transaction-scoped advisory lock. Records store masked questions, retrieved chunk ids and
+scores, cited chunks, model and prompt versions, latency and token use — enough to
+reconstruct any answer.
+
+### LLM provider abstraction
+The app needs only "JSON output against a schema" and "text from images". Gemini and Claude
+providers implement that interface; batch jobs (eval, gap analysis) can use a different
+model with its own quota and are disk-cached so re-runs cost nothing.
+
+### BFF (backend-for-frontend)
+The browser talks only to Next.js route handlers; the JWT sits in an `httpOnly`,
+`SameSite=Lax` cookie and is attached server-side when proxying to FastAPI, through an
+allow-list of API prefixes. FastAPI re-reads role/clearance from the database on every
+request, so revoking access is immediate.
+
+## 4. Security & privacy summary
+
+| Risk | Control |
+|---|---|
+| Hallucinated legal requirement | Quote verification, abstention threshold, "partial"/"insufficient" statuses, disclaimer |
+| Unauthorised disclosure | ACL in retrieval SQL, department scoping, API role checks, 404 (not 403) for hidden documents |
+| Customer PII sent to LLM / logs | Regex + checksum PII masking before LLM, audit stores masked text only |
+| Prompt injection (user or document) | Input screening, system prompt treats sources/questions as data, ACL independent of the model |
+| Stale rules | Effective dating, as-of queries, amendment notices, SHA-256 pinned sources |
+| Tampered records | Hash-chained audit with verification endpoint |
+| Token theft via XSS | httpOnly cookie, BFF allow-list |
+
+## 5. Operating characteristics (RTX 4060 Ti, local)
+
+- Ingestion of 14 documents (≈520 structured + ≈480 baseline chunks): ~60 s.
+- Retrieval incl. rerank: ~0.5–0.8 s; LLM answer (Gemini Flash): ~3–5 s.
+- Gap analysis of an 11-clause policy: ~1–3 min (parallel, rate-limit aware).
