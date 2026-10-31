@@ -200,3 +200,146 @@
   }
   :root:not(.dark) .source-text mark { background: rgba(0, 153, 255, 0.14); }
 }
+
+/* ---------- motion ---------- */
+@property --border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(18px); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(8%, 6%) scale(1.15); }
+}
+@keyframes drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1.1); }
+  50% { transform: translate(-10%, 4%) scale(0.9); }
+}
+@keyframes shimmer {
+  from { background-position: 0% 50%; }
+  to { background-position: 200% 50%; }
+}
+@keyframes spin-border {
+  to { --border-angle: 360deg; }
+}
+@keyframes caret {
+  50% { opacity: 0; }
+}
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.85); }
+  70% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(0, 153, 255, 0.55); }
+  100% { box-shadow: 0 0 0 10px rgba(0, 153, 255, 0); }
+}
+
+@layer components {
+  /* Staggered entrance: set --d (delay) inline */
+  .enter {
+    opacity: 0;
+    animation: fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms) forwards;
+  }
+
+  .aurora-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+  .aurora-blob.a {
+    width: 46rem; height: 30rem; left: 15%; top: -14rem;
+    background: rgba(0, 153, 255, 0.28);
+    animation: drift-a 18s ease-in-out infinite;
+  }
+  .aurora-blob.b {
+    width: 34rem; height: 26rem; right: -6rem; top: -6rem;
+    background: rgba(124, 92, 255, 0.22);
+    animation: drift-b 22s ease-in-out infinite;
+  }
+  .aurora-blob.c {
+    width: 28rem; height: 20rem; left: -8rem; bottom: -10rem;
+    background: rgba(0, 187, 136, 0.12);
+    animation: drift-b 26s ease-in-out infinite reverse;
+  }
+
+  /* Mouse-following light over the hairline grid (--mx/--my set from JS) */
+  .spotlight {
+    background: radial-gradient(
+      420px circle at var(--mx, 50%) var(--my, 30%),
+      rgba(0, 153, 255, 0.12),
+      transparent 70%
+    );
+    transition: background 0.08s linear;
+  }
+
+  .text-shimmer {
+    background-image: linear-gradient(90deg, #0099ff, #5cc4ff, #a78bfa, #5cc4ff, #0099ff);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 6s linear infinite;
+  }
+
+  /* Light travelling around a card border */
+  .border-spin {
+    position: relative;
+    isolation: isolate;
+  }
+  .border-spin::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--border-angle),
+      transparent 0deg,
+      rgba(0, 153, 255, 0.9) 40deg,
+      rgba(167, 139, 250, 0.8) 80deg,
+      transparent 140deg,
+      transparent 360deg
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: spin-border 6s linear infinite;
+  }
+
+  .caret::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 2px;
+    vertical-align: -0.15em;
+    background: currentColor;
+    animation: caret 1s steps(1) infinite;
+  }
+  .pop-in { animation: pop-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .pulse-ring { animation: pulse-ring 1.6s ease-out infinite; }
+  .lift { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s; }
+  .lift:hover { transform: translateY(-4px); border-color: rgba(0, 153, 255, 0.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter { animation: none; opacity: 1; }
+  .aurora-blob, .text-shimmer, .border-spin::before, .pulse-ring, .caret::after { animation: none; }
+  .lift:hover { transform: none; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(7px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(3px); }
+}
