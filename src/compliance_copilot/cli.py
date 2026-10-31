@@ -112,13 +112,20 @@ def evaluate(
     retrieval: bool = True,
     e2e: Annotated[bool, typer.Option("--e2e/--no-e2e", help="End-to-end eval (uses the LLM)")] = True,
     limit: int | None = None,
+    fresh: Annotated[bool, typer.Option("--fresh", help="Re-evaluate questions already done")] = False,
 ) -> None:
-    """Run the golden-set evaluation and write eval/results + docs/eval-report.md."""
+    """Run the golden-set evaluation and write eval/results + docs/eval-report.md.
+
+    End-to-end results accumulate across runs, so a quota-limited run resumes with the
+    questions not evaluated yet."""
     from .evaluation import run
 
-    out = run(retrieval=retrieval, end_to_end=e2e, limit=limit, log=console.print)
+    out = run(retrieval=retrieval, end_to_end=e2e, limit=limit, log=console.print, resume=not fresh)
     if out.get("end_to_end"):
-        console.print_json(json.dumps(out["end_to_end"]["summary"], ensure_ascii=False))
+        e = out["end_to_end"]
+        console.print_json(json.dumps(e["summary"], ensure_ascii=False))
+        if e.get("remaining"):
+            console.print(f"[yellow]{len(e['remaining'])} questions not evaluated yet - run again to continue[/yellow]")
     console.print("report: docs/eval-report.md")
 
 

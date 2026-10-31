@@ -14,6 +14,7 @@ through the disk cache, so an interrupted run resumes where it stopped.
 from __future__ import annotations
 
 import json
+import math
 import statistics
 import time
 from collections import defaultdict
@@ -158,10 +159,11 @@ def _contains_any(answer: str, alts: list[str]) -> bool:
     return any(_norm(x).lower() in a for x in alts)
 
 
-def eval_end_to_end(limit: int | None = None, log=print) -> dict[str, Any]:
+def eval_end_to_end(limit: int | None = None, log=print, skip: set[str] | None = None) -> dict[str, Any]:
     from .generation.answerer import answer_question
 
-    items = load_gold()[:limit] if limit else load_gold()
+    items = [it for it in load_gold() if it["id"] not in (skip or set())]
+    items = items[:limit] if limit else items
     users = _users()
     rows = []
     stopped = None
@@ -191,6 +193,7 @@ def eval_end_to_end(limit: int | None = None, log=print) -> dict[str, Any]:
         g = r.grounding or {}
         row = {
             "id": it["id"], "category": it["category"], "expect": expect, "status": r.status,
+            "evaluated_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "behaviour_ok": ok_behaviour, "key_facts_ok": facts_ok,
             "citation_precision": (len(rel_cited) / len(cited)) if cited and ev else None,
             "citation_recall": (len(ev_covered) / len(ev)) if ev and expect == "answer" else None,
@@ -204,13 +207,25 @@ def eval_end_to_end(limit: int | None = None, log=print) -> dict[str, Any]:
         rows.append(row)
         log(f"{it['id']:8s} {expect:7s} -> {r.status:22s} ok={ok_behaviour} facts={facts_ok} leak={leak}")
 
+    return {"rows": rows, "stopped_early": stopped,
+            "model": llm.get_provider("batch").model if llm.available() else None}
+
+
+def _percentile(values: list[int], q: float) -> int | None:
+    """Nearest-rank percentile (well defined for small samples)."""
+    if not values:
+        return None
+    v = sorted(values)
+    return v[max(0, math.ceil(q * len(v)) - 1)]
+
+
+def summarize_e2e(rows: list[dict[str, Any]]) -> dict[str, Any]:
     def mean(key: str, subset=None) -> float | None:
-        vals = [x[key] for x in (rows if subset is None else subset) if x.get(key) is not None]
-        vals = [float(v) for v in vals]
+        vals = [float(x[key]) for x in (rows if subset is None else subset) if x.get(key) is not None]
         return round(statistics.mean(vals), 3) if vals else None
 
     answer_rows = [x for x in rows if x["expect"] == "answer"]
-    lat = sorted(x["latency_ms"] for x in rows if x["latency_ms"])
+    lat = [x["latency_ms"] for x in rows if x.get("latency_ms")]
     q_total = sum(x["quotes_total"] or 0 for x in rows)
     summary = {
         "behaviour_accuracy": mean("behaviour_ok"),
@@ -220,8 +235,8 @@ def eval_end_to_end(limit: int | None = None, log=print) -> dict[str, Any]:
         "quote_verification_rate": round(sum(x["quotes_verified"] or 0 for x in rows) / q_total, 3) if q_total else None,
         "leakage_count": sum(x["leak"] for x in rows),
         "pii_masking_recall": mean("pii_masked", [x for x in rows if x["pii_expected"]]),
-        "latency_p50_ms": lat[len(lat) // 2] if lat else None,
-        "latency_p95_ms": lat[int(len(lat) * 0.95) - 1] if lat else None,
+        "latency_p50_ms": _percentile(lat, 0.5),
+        "latency_p95_ms": _percentile(lat, 0.95),
         "n_evaluated": len(rows),
     }
     by_cat = []
@@ -230,14 +245,26 @@ def eval_end_to_end(limit: int | None = None, log=print) -> dict[str, Any]:
         by_cat.append({"category": cat, "n": len(sub), "behaviour_accuracy": mean("behaviour_ok", sub),
                        "key_fact_accuracy": mean("key_facts_ok", sub),
                        "citation_recall": mean("citation_recall", sub)})
-    return {"summary": summary, "by_category": by_cat, "rows": rows, "stopped_early": stopped,
-            "model": llm.get_provider("batch").model if llm.available() else None}
+    return {"summary": summary, "by_category": by_cat}
+
+
+def merge_e2e(prev: dict[str, Any] | None, new: dict[str, Any]) -> dict[str, Any]:
+    """Accumulate results across runs: a quota-limited run only replaces the questions it
+    actually re-evaluated, so evaluation can be completed over several days."""
+    order = {it["id"]: i for i, it in enumerate(load_gold())}
+    merged = {r["id"]: r for r in (prev or {}).get("rows", []) if r["id"] in order}
+    merged.update({r["id"]: r for r in new["rows"]})
+    rows = sorted(merged.values(), key=lambda r: order[r["id"]])
+    return {**summarize_e2e(rows), "rows": rows, "stopped_early": new["stopped_early"],
+            "model": new["model"] or (prev or {}).get("model"),
+            "remaining": [i for i in order if i not in merged]}
 
 
 # ----------------------------------------------------------------------------- report
 
 
-def run(retrieval: bool = True, end_to_end: bool = True, limit: int | None = None, log=print) -> dict:
+def run(retrieval: bool = True, end_to_end: bool = True, limit: int | None = None, log=print,
+        resume: bool = True) -> dict:
     RESULTS.mkdir(parents=True, exist_ok=True)
     latest = RESULTS / "latest.json"
     prev = json.loads(latest.read_text(encoding="utf-8")) if latest.exists() else {}
@@ -260,7 +287,10 @@ def run(retrieval: bool = True, end_to_end: bool = True, limit: int | None = Non
         out["retrieval_ablation"] = prev["retrieval_ablation"]
         out["threshold_calibration"] = prev.get("threshold_calibration")
     if end_to_end and llm.available():
-        out["end_to_end"] = eval_end_to_end(limit, log)
+        done = {r["id"] for r in (prev.get("end_to_end") or {}).get("rows", [])} if resume else set()
+        if done:
+            log(f"resuming: {len(done)} questions already evaluated (use --fresh to redo them)")
+        out["end_to_end"] = merge_e2e(prev.get("end_to_end"), eval_end_to_end(limit, log, skip=done))
     elif prev.get("end_to_end"):
         out["end_to_end"] = prev["end_to_end"]
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -290,7 +320,9 @@ def render_markdown(ev: dict[str, Any]) -> str:
     if e2e:
         lines += ["## End-to-end (model: " + str(e2e.get("model")) + ")", ""]
         if e2e.get("stopped_early"):
-            lines += [f"> Stopped early: {e2e['stopped_early']}", ""]
+            lines += [f"> Last run stopped early: {e2e['stopped_early'][:160]}", ""]
+        if e2e.get("remaining"):
+            lines += [f"> Not yet evaluated ({len(e2e['remaining'])}): {', '.join(e2e['remaining'])}", ""]
         lines += ["| metric | value |", "|---|---|"]
         lines += [f"| {k} | {v} |" for k, v in e2e["summary"].items()]
         lines += ["", "| category | n | behaviour | key facts | citation recall |", "|---|---|---|---|---|"]
