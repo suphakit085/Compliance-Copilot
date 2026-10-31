@@ -1,0 +1,88 @@
+{
+ "created_at": "2026-10-31T21:23:30+00:00",
+ "n_questions": 51,
+ "settings": {
+  "embedding_model": "BAAI/bge-m3",
+  "reranker_model": "BAAI/bge-reranker-v2-m3",
+  "dense_top_k": 40,
+  "lexical_top_k": 40,
+  "rerank_candidates": 24,
+  "context_top_n": 6,
+  "abstain_threshold": 0.15,
+  "chunk_max_chars": 1400,
+  "gemini_model": "gemini-3.5-flash",
+  "gemini_batch_model": ""
+ },
+ "gold_problems": [],
+ "retrieval_ablation": [
+  {
+   "config": "A. Fixed-size chunks + vector only (baseline)",
+   "hit@1": 0.35,
+   "hit@3": 0.5,
+   "hit@6": 0.575,
+   "recall@1": 0.338,
+   "recall@3": 0.475,
+   "recall@6": 0.537,
+   "mrr": 0.434,
+   "leakage": 0,
+   "latency_ms": 611
+  },
+  {
+   "config": "B. Structure-aware chunks + vector only",
+   "hit@1": 0.625,
+   "hit@3": 0.85,
+   "hit@6": 0.9,
+   "recall@1": 0.575,
+   "recall@3": 0.825,
+   "recall@6": 0.887,
+   "mrr": 0.742,
+   "leakage": 0,
+   "latency_ms": 72
+  },
+  {
+   "config": "C. Structure-aware chunks + BM25 only",
+   "hit@1": 0.5,
+   "hit@3": 0.725,
+   "hit@6": 0.825,
+   "recall@1": 0.487,
+   "recall@3": 0.7,
+   "recall@6": 0.787,
+   "mrr": 0.622,
+   "leakage": 0,
+   "latency_ms": 28
+  },
+  {
+   "config": "D. Hybrid (vector + BM25 + references, RRF)",
+   "hit@1": 0.625,
+   "hit@3": 0.85,
+   "hit@6": 0.9,
+   "recall@1": 0.588,
+   "recall@3": 0.825,
+   "recall@6": 0.887,
+   "mrr": 0.74,
+   "leakage": 0,
+   "latency_ms": 113
+  },
+  {
+   "config": "E. Hybrid + cross-encoder rerank (production)",
+   "hit@1": 0.85,
+   "hit@3": 0.9,
+   "hit@6": 0.975,
+   "recall@1": 0.8,
+   "recall@3": 0.875,
+   "recall@6": 0.963,
+   "mrr": 0.891,
+   "leakage": 0,
+   "latency_ms": 795
+  }
+ ],
+ "threshold_calibration": {
+  "current": 0.15,
+  "current_accuracy": 1.0,
+  "best": 0.15,
+  "best_accuracy": 1.0,
+  "min_answerable_score": 0.2424,
+  "max_out_of_corpus_score": 0.0077,
+  "answerable_below_current": []
+ }
+}
