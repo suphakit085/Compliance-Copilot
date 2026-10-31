@@ -1,0 +1,50 @@
+{
+  "pdpa-2562": {
+    "url": "https://www.ocs.go.th/searchlaw/power_link/download/eyJ1dWlkIjoiMTc5NmU0ZjQtZTgxNi00ODgxLTg1ZWEtYTU4OWI2NjRjZTdhIiwiZmlsZW5hbWUiOiLguIQwMTM2IOC4nuC4o-C4sOC4o-C4suC4iuC4muC4seC4jeC4jeC4seC4leC4tCAyNTYyLTY54LiBLTUyLlBERiJ9.jZ8Egjp9J2zvIyWGwH-Ybn87GnkibJawbe4dDpKCfls",
+    "sha256": "9fd1027c2e5ad93029a01d68d52d524750c1e8946b97f12fb230c11959da2f70",
+    "bytes": 343490,
+    "retrieved_at": "2026-10-31T21:50:53+00:00"
+  },
+  "pdpc-breach-2565": {
+    "url": "https://db.legal.tu.ac.th/wp-content/uploads/2025/05/PDPC_Notification_Data_Breach_Reporting_Criteria_B.E._2565.pdf",
+    "sha256": "38ae790fba5abef7785fb1212e3eb9e27cfdfc910bf02646b53e128185db0d09",
+    "bytes": 104789,
+    "retrieved_at": "2026-10-31T21:50:53+00:00"
+  },
+  "amla-2542": {
+    "url": "https://sed.amlo.go.th/uploads/tiny/Law%20and%20regulaiton/Act/AMLA%20Act.pdf",
+    "sha256": "ce244bb36546ec223197f5b550fa3093a9557f7627dfbcf21701c19287e73eac",
+    "bytes": 608313,
+    "retrieved_at": "2026-10-31T21:50:53+00:00"
+  },
+  "cdd-2563": {
+    "url": "https://sed.amlo.go.th/content/download/221",
+    "sha256": "160f91c6920eff7366c7cf012a337d7d6054f36d59cc8af937f478aa7d253994",
+    "bytes": 203528,
+    "retrieved_at": "2026-10-31T21:50:53+00:00"
+  },
+  "bot-responsible-lending-2566": {
+    "url": "https://www.bot.or.th/content/dam/bot/fipcs/documents/FPG/2566/ThaiPDF/25660239.pdf",
+    "sha256": "16173531da89fd6f5f3100d9af4024f0ad8482493612cb0e6fba8b49fddef4c6",
+    "bytes": 3214999,
+    "retrieved_at": "2026-10-31T21:50:53+00:00"
+  },
+  "bot-amlo-sanctions-jps-2567": {
+    "url": "https://www.bot.or.th/content/dam/bot/fipcs/documents/FPG/2567/ThaiPDF/25670220.pdf",
+    "sha256": "5ba1fada718a27cdd02ea228507d090c739fd095e9283847f47722c97a1c87f0",
+    "bytes": 1334019,
+    "retrieved_at": "2026-10-31T21:50:53+00:00"
+  },
+  "sec-tt-35-2556": {
+    "url": "https://www.thaibma.or.th/pdf/Convention/doc/1_35_2556.pdf",
+    "sha256": "00bf718a155197e1b7ca10c4c78224ba564edcdcf237d1492b607ddbed8b6375",
+    "bytes": 396931,
+    "retrieved_at": "2026-10-31T21:50:53+00:00"
+  },
+  "sec-outsourcing-circular-2568": {
+    "url": "https://www.thaibma.or.th/pdf/Convention/doc/1_35_2556-25-01.pdf",
+    "sha256": "4a7812217b9dd398a0cfbedbb27970d28eafca6d8f8cb36b9ec18e53e9fae8a9",
+    "bytes": 188655,
+    "retrieved_at": "2026-10-31T21:50:53+00:00"
+  }
+}
