@@ -41,13 +41,22 @@ Retrieval ablation on the golden set (answerable questions, top-6 context, RTX 4
 | B. Structure-aware chunks + vector only | 0.625 | 0.900 | 0.887 | 0.742 | 0 |
 | C. Structure-aware chunks + BM25 only | 0.50 | 0.825 | 0.787 | 0.622 | 0 |
 | D. Hybrid (vector + BM25 + references, RRF) | 0.625 | 0.900 | 0.887 | 0.740 | 0 |
-| **E. Hybrid + cross-encoder rerank (production)** | **0.85** | **0.975** | **0.963** | **0.891** | **0** |
+| E. Hybrid + cross-encoder rerank | 0.85 | 0.975 | 0.963 | 0.891 | 0 |
+| **F. E + domain glossary expansion (production)** | **0.85** | **1.000** | **0.988** | **0.900** | **0** |
 
 - Chunking by legal unit (มาตรา/ข้อ) instead of fixed windows is the single biggest win.
 - The reranker separates in-corpus from out-of-corpus questions cleanly (lowest answerable
   question 0.24 vs highest out-of-corpus 0.008), so the abstention threshold (0.15)
   makes no mistakes on this set.
 - Confidential-document leakage is 0 in every configuration.
+- The glossary (F) closes a vocabulary gap the eval exposed: users say "ข้อมูลอ่อนไหว" but
+  PDPA มาตรา 26 never uses that word. Because the fix was informed by this set, F's last
+  points should be confirmed on held-out questions.
+
+End-to-end on the first 11 questions with Gemini 3.5 Flash (the free-tier daily quota ended
+the run; it resumes from cache): key-fact accuracy 100%, quote verification 100% (every
+cited quote found verbatim in its source), 0 leakage. The one miss was the glossary case
+above - the model answered "insufficient evidence" rather than guessing.
 
 Policy Gap Analysis on the synthetic PDPA policy found both planted conflicts (breach
 notification "7 days" vs 72 hours in มาตรา 37(4); access requests "45 days" vs 30 days in
@@ -85,6 +94,7 @@ flowchart LR
 | Embeddings | BAAI/bge-m3 (local GPU/CPU) | Strong Thai performance; document text never leaves the environment for indexing |
 | Lexical | PyThaiNLP `newmm` segmentation + BM25 with corpus IDF | Thai has no spaces; Postgres FTS alone has no IDF |
 | Reranker | BAAI/bge-reranker-v2-m3 | +7.5 pts Hit@6, and a calibrated score for abstention |
+| Query expansion | Curated domain glossary | Bridges colloquial terms ("ข้อมูลอ่อนไหว", "บัญชีม้า") to statutory wording |
 | LLM | Gemini 3.5 Flash (pluggable; Claude provider included) | Provider-agnostic: grounding is verified by our code, not by a provider feature |
 | API | FastAPI, JWT, role-based endpoints | Authorisation lives server-side; the UI is untrusted |
 | Web | Next.js 16 + shadcn/ui, BFF proxy with httpOnly cookie | Session token is never readable by browser JavaScript |
@@ -161,8 +171,8 @@ deliberately planted gaps for the gap-analysis demo.
   sampled from real compliance queries and reviewed by the compliance team.
 - End-to-end metrics depend on LLM quota; run `uv run copilot eval` (results are cached
   so interrupted runs resume).
-- Gap analysis missed that a biometric-data clause is governed by PDPA มาตรา 26 (retrieval
-  by clause text alone) — next step is query expansion with the clause's topic.
+- Vocabulary gaps between how staff ask and how statutes are worded are handled by a
+  curated glossary (`data/glossary.yaml`); it needs an owner and a review process.
 - Production hardening: SSO/OIDC instead of demo passwords, Postgres row-level security as
   a second ACL layer, an on-prem LLM option for data residency, streaming responses,
   scheduled re-ingestion when regulators publish amendments.
