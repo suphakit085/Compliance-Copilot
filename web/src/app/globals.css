@@ -1,0 +1,202 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Design language: pure-black canvas, near-black panels, hairline borders, one electric-blue
+   accent with a neon glow on the primary input (after framer.com). */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), var(--font-thai), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-inter), var(--font-thai), ui-sans-serif, system-ui, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-brand: var(--brand);
+  --color-success: var(--success);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --brand: #0099ff;
+  --success: #00bb88;
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #0099ff;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f4f4f5;
+  --muted-foreground: #6b6b6b;
+  --accent: #f4f4f5;
+  --accent-foreground: #0a0a0a;
+  --destructive: #e5484d;
+  --border: rgba(0, 0, 0, 0.08);
+  --input: rgba(0, 0, 0, 0.1);
+  --ring: rgba(0, 153, 255, 0.5);
+  --chart-1: #0099ff;
+  --chart-2: #00bb88;
+  --chart-3: #8b5cf6;
+  --chart-4: #f59e0b;
+  --chart-5: #999999;
+  --radius: 0.625rem;
+  --sidebar: #fafafa;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: #0099ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f4f5;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --sidebar-ring: rgba(0, 153, 255, 0.5);
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #111111;
+  --card-foreground: #ffffff;
+  --popover: #141414;
+  --popover-foreground: #ffffff;
+  --primary: #0099ff;
+  --primary-foreground: #ffffff;
+  --secondary: #1e1e1e;
+  --secondary-foreground: #ffffff;
+  --muted: #1a1a1a;
+  --muted-foreground: #999999;
+  --accent: #1e1e1e;
+  --accent-foreground: #ffffff;
+  --destructive: #ff5c5c;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: rgba(0, 153, 255, 0.55);
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #0099ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: rgba(0, 153, 255, 0.55);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+  }
+  ::selection {
+    background: rgba(0, 153, 255, 0.35);
+  }
+}
+
+@layer components {
+  /* Neon-glow input shell (the "Ask Framer…" box) */
+  .glow-shell {
+    position: relative;
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(0, 153, 255, 0.10), rgba(0, 153, 255, 0.02)), var(--card);
+    border: 1px solid rgba(0, 153, 255, 0.55);
+    box-shadow:
+      0 0 0 1px rgba(0, 153, 255, 0.15) inset,
+      0 0 24px rgba(0, 153, 255, 0.35),
+      0 0 80px rgba(0, 120, 255, 0.18);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  .glow-shell:focus-within {
+    border-color: rgba(64, 176, 255, 0.9);
+    box-shadow:
+      0 0 0 1px rgba(0, 153, 255, 0.25) inset,
+      0 0 32px rgba(0, 153, 255, 0.5),
+      0 0 120px rgba(0, 120, 255, 0.25);
+  }
+  :root:not(.dark) .glow-shell {
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(0, 153, 255, 0.08), 0 10px 40px rgba(0, 153, 255, 0.15);
+  }
+
+  /* Soft blue aurora behind hero sections */
+  .aurora {
+    background:
+      radial-gradient(60% 50% at 50% 0%, rgba(0, 153, 255, 0.22), transparent 70%),
+      radial-gradient(40% 40% at 85% 10%, rgba(120, 80, 255, 0.12), transparent 70%);
+  }
+  :root:not(.dark) .aurora {
+    background: radial-gradient(60% 50% at 50% 0%, rgba(0, 153, 255, 0.10), transparent 70%);
+  }
+
+  .panel {
+    @apply rounded-[14px] border bg-card;
+  }
+  .hairline-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .answer-prose { line-height: 1.85; font-size: 0.95rem; }
+  .answer-prose p { margin: 0.4rem 0; }
+  .answer-prose ul { list-style: disc; padding-left: 1.25rem; margin: 0.4rem 0; }
+  .answer-prose ol { list-style: decimal; padding-left: 1.25rem; margin: 0.4rem 0; }
+  .answer-prose li { margin: 0.2rem 0; }
+  .answer-prose li::marker { color: var(--muted-foreground); }
+  .answer-prose strong { font-weight: 600; }
+  .answer-prose h1, .answer-prose h2, .answer-prose h3 { font-weight: 600; margin: 0.6rem 0 0.3rem; }
+  .source-text { white-space: pre-wrap; line-height: 1.85; font-size: 0.875rem; }
+  .source-text mark {
+    background: rgba(0, 153, 255, 0.22);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 2px;
+    box-shadow: 0 0 0 1px rgba(0, 153, 255, 0.35);
+  }
+  :root:not(.dark) .source-text mark { background: rgba(0, 153, 255, 0.14); }
+}
