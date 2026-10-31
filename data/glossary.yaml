@@ -1,0 +1,35 @@
+# Domain glossary: how people ask  ->  how the law words it.
+#
+# Compliance staff use shorthand ("ข้อมูลอ่อนไหว", "DSAR", "บัญชีม้า") that never appears in
+# the statute text, so neither BM25 nor embeddings can bridge the gap reliably. When a
+# term below appears in a question, its expansion is added to the retrieval query.
+# Add entries when evaluation or user feedback shows a vocabulary miss - each entry
+# should name the provision it points to.
+
+terms:
+  - match: [ข้อมูลอ่อนไหว, ข้อมูลส่วนบุคคลอ่อนไหว, sensitive data, sensitive personal data]
+    expand: ข้อมูลส่วนบุคคลเกี่ยวกับเชื้อชาติ เผ่าพันธุ์ ความคิดเห็นทางการเมือง ความเชื่อในลัทธิ ศาสนา พฤติกรรมทางเพศ ประวัติอาชญากรรม ข้อมูลสุขภาพ ข้อมูลพันธุกรรม ข้อมูลชีวภาพ (PDPA มาตรา 26)
+
+  - match: [ข้อมูลชีวภาพ, biometric, ไบโอเมตริก, สแกนใบหน้า, ลายนิ้วมือ]
+    expand: ห้ามมิให้เก็บรวบรวมข้อมูลส่วนบุคคลเกี่ยวกับข้อมูลชีวภาพ โดยไม่ได้รับความยินยอมโดยชัดแจ้ง (PDPA มาตรา 26)
+
+  - match: [DSAR, data subject access request, ขอดูข้อมูลตัวเอง, ขอสำเนาข้อมูล]
+    expand: เจ้าของข้อมูลส่วนบุคคลมีสิทธิขอเข้าถึงและขอรับสำเนาข้อมูลส่วนบุคคล (PDPA มาตรา 30)
+
+  - match: [ข้อมูลรั่ว, ข้อมูลรั่วไหล, data breach, เหตุละเมิดข้อมูล]
+    expand: เหตุการละเมิดข้อมูลส่วนบุคคล แจ้งเหตุการละเมิดแก่สำนักงาน (PDPA มาตรา 37 (4))
+
+  - match: [KYC, รู้จักลูกค้า]
+    expand: การแสดงตน การตรวจสอบเพื่อทราบข้อเท็จจริงเกี่ยวกับลูกค้า (CDD)
+
+  - match: [PEP, PEPs, นักการเมือง]
+    expand: บุคคลที่มีสถานภาพทางการเมือง
+
+  - match: [STR, ธุรกรรมต้องสงสัย]
+    expand: ธุรกรรมที่มีเหตุอันควรสงสัย รายงานต่อสำนักงาน ปปง. (AMLA มาตรา 13)
+
+  - match: [บัญชีม้า, mule account]
+    expand: บัญชีที่ใช้รับโอนเงินจากการกระทำความผิด ธุรกรรมที่มีเหตุอันควรสงสัย
+
+  - match: [suitability, ความเหมาะสมของการลงทุน]
+    expand: การจัดให้มีข้อมูลลูกค้า การประเมินความเหมาะสมในการลงทุน (know your customer / suitability)
