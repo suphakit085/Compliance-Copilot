@@ -34,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [health, setHealth] = useState<Health | null>(null);
   const pathname = usePathname();
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
     api<User>("/me").then(setUser).catch(() => {});
@@ -114,9 +114,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 variant="outline"
                 size="icon-sm"
                 aria-label="สลับธีม"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
               >
-                {theme === "dark" ? <Sun /> : <Moon />}
+                {/* both icons render; CSS picks one, so server and client HTML match */}
+                <Sun className="hidden dark:block" />
+                <Moon className="dark:hidden" />
               </Button>
             </div>
           </div>

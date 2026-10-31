@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Link2, Loader2, ShieldCheck, ShieldX } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -29,17 +29,36 @@ export default function AuditPage() {
   const [selected, setSelected] = useState<AuditRow | null>(null);
   const [verify, setVerify] = useState<{ valid: boolean; checked: number; head?: string; broken_at_id?: number } | null>(null);
   const [checking, setChecking] = useState(false);
+  const [denied, setDenied] = useState<string | null>(null);
 
   const load = useCallback(() => {
     const qs = event === "ทั้งหมด" ? "" : `&event=${event}`;
-    api<AuditRow[]>(`/audit?limit=200${qs}`).then((r) => { setRows(r); setSelected(r[0] ?? null); });
+    api<AuditRow[]>(`/audit?limit=200${qs}`)
+      .then((r) => { setRows(r); setSelected(r[0] ?? null); })
+      .catch((e) => setDenied(e instanceof ApiError && e.status === 403 ? "หน้านี้สำหรับเจ้าหน้าที่ Compliance ผู้ตรวจสอบภายใน และผู้ดูแลระบบเท่านั้น" : String(e)));
   }, [event]);
   useEffect(load, [load]);
 
   async function check() {
     setChecking(true);
-    setVerify(await api("/audit/verify"));
-    setChecking(false);
+    try {
+      setVerify(await api("/audit/verify"));
+    } catch {
+      setDenied("ไม่สามารถตรวจสอบ hash chain ได้");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  if (denied) {
+    return (
+      <div className="flex h-full flex-col">
+        <PageHeader title="Audit Trail" />
+        <div className="m-8 rounded-[14px] border border-dashed p-10 text-center text-sm text-muted-foreground">
+          {denied}
+        </div>
+      </div>
+    );
   }
 
   return (

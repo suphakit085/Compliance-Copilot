@@ -126,7 +126,10 @@ export default function ChatPage() {
   const panelEntry = panelMsg !== undefined ? messages[panelMsg] : undefined;
   const panel = panelEntry?.role === "assistant" ? panelEntry.response : undefined;
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [messages.length, loading]);
+  useEffect(() => {
+    // scrollIntoView() returns a Promise in recent browsers - an effect must not return it
+    bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length, loading]);
 
   async function send(text: string) {
     const question = text.trim();
