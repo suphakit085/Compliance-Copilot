@@ -1,6 +1,6 @@
 # Evaluation report
 
-Generated 2026-10-31T21:56:49+00:00 · golden set: 51 questions (`eval/golden_set.yaml`)
+Generated 2026-10-31T22:05:00+00:00 · golden set: 51 questions (`eval/golden_set.yaml`)
 
 ## Retrieval ablation (top-6 context, answerable questions)
 
@@ -21,30 +21,28 @@ Generated 2026-10-31T21:56:49+00:00 · golden set: 51 questions (`eval/golden_se
 
 ## End-to-end (model: gemini-3.5-flash)
 
-> Stopped early: Gemini daily quota exhausted for gemini-3.5-flash: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemin
+> Last run stopped early: Gemini daily quota exhausted for gemini-3.5-flash: You exceeded your current quota, please check your plan and billing details. For more information on this err
+
+> Not yet evaluated (41): pdpa-03, cdd-02, cdd-03, cdd-04, bot-01, bot-02, bot-03, bot-04, bot-05, bot-06, ocr-01, sec-01, sec-02, sec-03, sec-04, sec-05, sec-06, pol-01, pol-02, pol-03, pol-04, pol-05, pol-06, conf-01, conf-02, conf-03, rbac-01, rbac-02, rbac-03, rbac-04, ref-01, ref-02, oos-01, oos-02, una-01, una-02, una-03, inj-01, inj-02, inj-03, pii-01
 
 | metric | value |
 |---|---|
-| behaviour_accuracy | 0.909 |
+| behaviour_accuracy | 1.0 |
 | key_fact_accuracy | 1.0 |
-| citation_precision | 0.65 |
-| citation_recall | 0.909 |
+| citation_precision | 0.715 |
+| citation_recall | 1.0 |
 | quote_verification_rate | 1.0 |
 | leakage_count | 0 |
 | pii_masking_recall | None |
-| latency_p50_ms | 10071 |
-| latency_p95_ms | 14755 |
-| n_evaluated | 11 |
+| latency_p50_ms | 8956 |
+| latency_p95_ms | 27420 |
+| n_evaluated | 10 |
 
 | category | n | behaviour | key facts | citation recall |
 |---|---|---|---|---|
-| regulation | 11 | 0.909 | 1.0 | 0.909 |
+| regulation | 10 | 1.0 | 1.0 | 1.0 |
 
 Notes: `citation_precision` counts a cited source as correct only if it contains a gold
 evidence string, so legitimate extra citations (e.g. the internal policy cited next to the
 law it implements) lower it; `quote_verification_rate` is the faithfulness measure - the
 share of cited quotes found verbatim in the cited source.
-
-### Failures to review
-
-- **pdpa-03** expected answer, got insufficient_evidence (key facts: True, leak: False)
