@@ -1,0 +1,165 @@
+# Extended set - SEC circular 50/2568, BOT-AMLO joint policy statement 2567, PDPC breach notification 2565.
+# review: draft (see docs/evaluation-review.md)
+
+items:
+  - id: x-circ-01
+    category: regulation
+    user: nida
+    question: ถ้าบริษัทหลักทรัพย์จะเพิ่มบริการหรือผลิตภัณฑ์ใหม่ ต้องรายงาน ก.ล.ต. ล่วงหน้ากี่วัน
+    expect: answer
+    evidence:
+      - {doc: sec-outsourcing-circular-2568, text: ให้ผู้ประกอบธุรกิจรายงานต่อสำนักงาน ก.ล.ต. ล่วงหน้า 3 วันก่อนเริ่มให้บริการ}
+    key_facts: [["3 วัน", "สามวัน"], ["ล่วงหน้า"]]
+
+  - id: x-circ-02
+    category: regulation
+    user: nida
+    question: เปลี่ยนผู้ให้บริการระบบดูแลรักษาทรัพย์สินลูกค้า ต้องรายงาน ก.ล.ต. ภายในกี่วัน
+    expect: answer
+    evidence:
+      - {doc: sec-outsourcing-circular-2568, text: ภายใน 15 วันนับแต่วันที่มีการเปลี่ยนแปลงดังกล่าว}
+    key_facts: [["15 วัน"]]
+
+  - id: x-circ-03
+    category: regulation
+    user: nida
+    question: ถ้าเปลี่ยนบริษัทที่ร่วมกันให้บริการลูกค้ากับเรา ต้องรายงาน ก.ล.ต. เมื่อไร
+    expect: answer
+    evidence:
+      - {doc: sec-outsourcing-circular-2568, text: ให้ผู้ประกอบธุรกิจรายงานต่อสำนักงาน ก.ล.ต. โดยไม่ชักช้า}
+    key_facts: [["ไม่ชักช้า"]]
+
+  - id: x-circ-04
+    category: regulation
+    user: nida
+    question: หลักเกณฑ์การรายงานการเปลี่ยนแปลงธุรกิจแบบใหม่ของ ก.ล.ต. เริ่มใช้เมื่อไร
+    expect: answer
+    evidence:
+      - {doc: sec-outsourcing-circular-2568, text: ตั้งแต่วันที่ 1 เมษายน พ.ศ. 2569 เป็นต้นไป}
+    key_facts: [["1 เมษายน", "เมษายน 2569"]]
+
+  - id: x-circ-05
+    category: regulation
+    user: nida
+    question: หลัก responsible business ที่ ก.ล.ต. กำหนด ให้บริษัทต้องมีกลไกกำกับดูแลเรื่องอะไรบ้าง
+    expect: answer
+    evidence:
+      - {doc: sec-outsourcing-circular-2568, text: "ผลิตภัณฑ์และบริการ: ควรกำหนดกลุ่มลูกค้าเป้าหมาย"}
+    key_facts: [["ผลิตภัณฑ์"], ["ค่าธรรมเนียม", "ราคา"], ["ความเข้าใจของลูกค้า", "ความเข้าใจ"]]
+
+  - id: x-circ-06
+    category: regulation
+    user: nida
+    question: บริษัทหลักทรัพย์ที่เดิมให้บริการเฉพาะลูกค้าสถาบัน อยากเปิดให้ลูกค้ารายย่อยด้วย ต้องทำอะไร
+    expect: answer
+    evidence:
+      - {doc: sec-outsourcing-circular-2568, text: "การเปลี่ยนแปลงขอบเขตฐานลูกค้า: กรณีผู้ประกอบธุรกิจมีความประสงค์จะเพิ่มประเภทลูกค้าใหม่"}
+    key_facts: [["รายงาน"], ["ฐานลูกค้า", "ประเภทลูกค้า"]]
+
+  - id: x-jps-01
+    category: regulation
+    user: nida
+    question: ธนาคารต้องอนุมัติลูกค้าความเสี่ยงสูงด้านการคว่ำบาตรในระดับไหน
+    expect: answer
+    evidence:
+      - {doc: bot-amlo-sanctions-jps-2567, text: ผู้บริหารระดับสูงต้องเป็นผู้อนุมัติการสร้างความสัมพันธ์ทางธุรกิจหรือการทำธุรกรรมเป็นครั้งคราว}
+    key_facts: [["ผู้บริหารระดับสูง"]]
+
+  - id: x-jps-02
+    category: regulation
+    user: nida
+    question: ธนาคารต้องมีระบบตรวจจับความเสี่ยงเกี่ยวกับการคว่ำบาตรอย่างไร
+    expect: answer
+    evidence:
+      - {doc: bot-amlo-sanctions-jps-2567, text: ต้องมีวิธีการและระบบประเมิน ติดตามและตรวจจับความเสี่ยงที่เกี่ยวข้องกับการคว่ำบาตร}
+    key_facts: [["ตรวจจับ", "แจ้งเตือน"]]
+
+  - id: x-jps-03
+    category: regulation
+    user: nida
+    question: นโยบายร่วม ธปท.-ปปง. เรื่องการคว่ำบาตรเริ่มใช้เมื่อไร
+    expect: answer
+    evidence:
+      - {doc: bot-amlo-sanctions-jps-2567, text: ให้ถือปฏิบัติตั้งแต่วันที่ 27 ธันวาคม พ.ศ. 2567 เป็นต้นไป}
+    key_facts: [["27 ธันวาคม", "2567"]]
+
+  - id: x-jps-04
+    category: regulation
+    user: nida
+    question: ผู้บริหารระดับสูงต้องทบทวนเพดานความเสี่ยงด้านการคว่ำบาตรบ่อยแค่ไหน
+    expect: answer
+    evidence:
+      - {doc: bot-amlo-sanctions-jps-2567, text: ทบทวนกระบวนการบริหารความเสี่ยง รวมถึงเพดานความเสี่ยงอย่างสม่ำเสมอหรือทุกครั้งที่มีเหตุการณ์สำคัญ}
+    key_facts: [["สม่ำเสมอ"], ["เหตุการณ์สำคัญ"]]
+
+  - id: x-brc-01
+    category: regulation
+    user: nida
+    question: ข้อมูลรั่วที่เจ้าหน้าที่ปล่อยอีเมลผิดคน นับเป็นการละเมิดข้อมูลประเภทไหน
+    expect: answer
+    evidence:
+      - {doc: pdpc-breach-2565, text: การละเมิดความลับของข้อมูลส่วนบุคคล (Confidentiality Breach)}
+    key_facts: [["ความลับ", "Confidentiality"]]
+
+  - id: x-brc-02
+    category: regulation
+    user: nida
+    question: ระบบล่มจนเข้าถึงข้อมูลลูกค้าไม่ได้ นับเป็นเหตุละเมิดข้อมูลไหม
+    expect: answer
+    evidence:
+      - {doc: pdpc-breach-2565, text: การละเมิดความพร้อมใช้งานของข้อมูลส่วนบุคคล (Availability Breach)}
+    key_facts: [["ความพร้อมใช้งาน", "Availability"]]
+
+  - id: x-brc-03
+    category: regulation
+    user: nida
+    question: เมื่อได้รับแจ้งว่าอาจมีข้อมูลรั่ว ต้องทำอะไรเป็นขั้นแรก
+    expect: answer
+    evidence:
+      - {doc: pdpc-breach-2565, text: ประเมินความน่าเชื่อถือของข้อมูลดังกล่าว และตรวจสอบข้อเท็จจริงเกี่ยวกับการละเมิดข้อมูลส่วนบุคคลในเบื้องต้น}
+    key_facts: [["ประเมิน", "ตรวจสอบ"], ["ข้อเท็จจริง"]]
+
+  - id: x-brc-04
+    category: regulation
+    user: nida
+    question: เมื่อข้อมูลรั่วและมีความเสี่ยงสูง ต้องแจ้งเจ้าของข้อมูลด้วยไหม
+    expect: answer
+    evidence:
+      - {doc: pdpc-breach-2565, text: ให้ผู้ควบคุมข้อมูลส่วนบุคคลแจ้งเหตุการละเมิดให้เจ้าของข้อมูลส่วนบุคคลทราบ}
+    key_facts: [["เจ้าของข้อมูล"], ["ความเสี่ยงสูง"]]
+
+  - id: x-brc-05
+    category: regulation
+    user: nida
+    question: การแจ้งเหตุละเมิดต่อ สคส. ต้องมีข้อมูลอะไรบ้าง
+    expect: answer
+    evidence:
+      - {doc: pdpc-breach-2565, text: ข้อมูลเกี่ยวกับผลกระทบที่อาจเกิดขึ้นจากเหตุการละเมิดข้อมูลส่วนบุคคล}
+    key_facts: [["ผลกระทบ"], ["มาตรการ"], ["เจ้าหน้าที่คุ้มครองข้อมูล", "ติดต่อ"]]
+
+  - id: x-brc-06
+    category: regulation
+    user: nida
+    question: ถ้าแจ้งเหตุละเมิดช้ากว่า 72 ชั่วโมงเพราะมีเหตุจำเป็น ต้องทำอย่างไร
+    expect: answer
+    evidence:
+      - {doc: pdpc-breach-2565, text: ในกรณีที่มีเหตุจำเป็นที่ทำให้แจ้งเหตุการละเมิดข้อมูลส่วนบุคคลล่าช้ากว่าเจ็ดสิบสองชั่วโมงนับแต่ทราบเหตุ}
+    key_facts: [["ชี้แจง", "เหตุผล", "เหตุจำเป็น"]]
+
+  - id: x-brc-07
+    category: regulation
+    user: nida
+    question: ประเมินความเสี่ยงของเหตุละเมิดข้อมูล ต้องดูปัจจัยอะไรบ้าง
+    expect: answer
+    evidence:
+      - {doc: pdpc-breach-2565, text: ปริมาณของข้อมูลส่วนบุคคลที่เกี่ยวข้องกับการละเมิด}
+    key_facts: [["ปริมาณ", "จำนวน"], ["ประเภท", "ลักษณะ"]]
+
+  - id: x-brc-08
+    category: regulation
+    user: nida
+    question: ถ้าแจ้ง สคส. แล้ว จะพ้นความรับผิดตามกฎหมายอื่นของกิจการเราด้วยไหม
+    expect: answer
+    evidence:
+      - {doc: pdpc-breach-2565, text: ไม่เป็นเหตุยกเว้นหน้าที่หรือความรับผิดของผู้ควบคุมข้อมูลส่วนบุคคลตามกฎหมายเฉพาะที่เกี่ยวข้องกับกิจการนั้น}
+    key_facts: [["ไม่"], ["กฎหมายเฉพาะ", "กฎหมายอื่น"]]
