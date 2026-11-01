@@ -1,0 +1,76 @@
+{
+  "realm": "copilot",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginTheme": "keycloak",
+  "groups": [
+    { "name": "copilot-employee" },
+    { "name": "copilot-compliance" },
+    { "name": "copilot-audit" },
+    { "name": "copilot-admin" }
+  ],
+  "clients": [
+    {
+      "clientId": "compliance-copilot",
+      "name": "Compliance Copilot",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "dev-only-client-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/api/auth/sso/callback"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:3000/login" },
+      "defaultClientScopes": ["openid", "profile", "email"],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "sso.employee",
+      "firstName": "อรุณ",
+      "lastName": "พนักงาน",
+      "email": "sso.employee@demo-bank.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "demo-sso", "temporary": false }],
+      "groups": ["copilot-employee"]
+    },
+    {
+      "username": "sso.compliance",
+      "firstName": "มาลี",
+      "lastName": "คอมไพลแอนซ์",
+      "email": "sso.compliance@demo-bank.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "demo-sso", "temporary": false }],
+      "groups": ["copilot-compliance"]
+    },
+    {
+      "username": "sso.nogroup",
+      "firstName": "ไม่มี",
+      "lastName": "สิทธิ์",
+      "email": "sso.nogroup@demo-bank.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "demo-sso", "temporary": false }],
+      "groups": []
+    }
+  ]
+}

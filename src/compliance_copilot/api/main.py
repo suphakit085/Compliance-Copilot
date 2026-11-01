@@ -16,7 +16,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 
-from .. import __version__, audit, history, llm
+from .. import __version__, audit, history, llm, sso
 from ..config import ROOT, get_settings
 from ..db import AuditLog, Chunk, Document, Feedback, as_reader, engine, init_db, session
 from ..features import gap_analysis
@@ -105,6 +105,51 @@ def login(body: LoginIn) -> LoginOut:
         audit.log_event("login_failed", {"username": body.username})
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
     audit.log_event("login", {}, user)
+    return LoginOut(access_token=issue_token(user), user=_user_out(user))
+
+
+class SSOConfig(BaseModel):
+    enabled: bool
+    label: str = ""
+
+
+class SSOStart(BaseModel):
+    url: str
+    state_token: str
+
+
+class SSOCallback(BaseModel):
+    code: str
+    state: str
+    state_token: str
+
+
+@app.get("/auth/sso/config", response_model=SSOConfig, tags=["auth"])
+def sso_config() -> SSOConfig:
+    return SSOConfig(enabled=sso.enabled(), label=get_settings().oidc_label)
+
+
+@app.get("/auth/sso/start", response_model=SSOStart, tags=["auth"])
+def sso_start() -> SSOStart:
+    if not sso.enabled():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "SSO is not configured")
+    try:
+        url, token = sso.begin()
+    except sso.SSOError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    return SSOStart(url=url, state_token=token)
+
+
+@app.post("/auth/sso/callback", response_model=LoginOut, tags=["auth"])
+def sso_callback(body: SSOCallback) -> LoginOut:
+    if not sso.enabled():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "SSO is not configured")
+    try:
+        user = sso.complete(body.code, body.state, body.state_token)
+    except sso.SSOError as e:
+        audit.log_event("login_failed", {"method": "sso", "reason": str(e)})
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from e
+    audit.log_event("login", {"method": "sso"}, user)
     return LoginOut(access_token=issue_token(user), user=_user_out(user))
 
 
