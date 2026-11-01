@@ -63,3 +63,17 @@ def test_benign_questions_pass(benign):
 )
 def test_legal_vocabulary_is_not_injection(legal_question):
     assert not screen(legal_question).blocked
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"),
+    [
+        ("คุณสมศรี มีสุข ขอถอนความยินยอม", True),  # regression from the held-out set
+        ("ลูกค้าคุณวิภาวดี ศรีสุข โทรมา", True),
+        ("คุณสมบัติของกรรมการคืออะไร", False),
+        ("คุณช่วยอธิบาย PDPA หน่อย", False),
+        ("คุณภาพข้อมูลต้องดูแลอย่างไร", False),
+    ],
+)
+def test_khun_title_vs_ordinary_words(text, masked):
+    assert mask_pii(text).has_pii is masked

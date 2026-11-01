@@ -256,23 +256,30 @@ def retrieve(
 
     selected = fused[:top_n]
 
-    # "Does our policy comply with the law?" - the reranker favours the policy the question
-    # names, so the governing regulation can fall out of the context. Look it up with the
-    # policy clause itself (as gap analysis does) and reserve slots for it.
+    # An internal policy never stands alone: if the context is led by a policy clause and holds
+    # no regulation, look up the law governing that clause (as gap analysis does) and reserve
+    # slots for it - otherwise a wrong policy (e.g. "45 days") can be repeated as the answer.
+    # Comparison questions ("does our policy comply?") accept weaker matches than plain ones.
+    is_comparison = bool(_COMPARISON.search(query))
+    bar = s.abstain_threshold if is_comparison else s.policy_pairing_threshold
+    # Count only regulations that are actually relevant: low-scoring ones that merely fill
+    # slots (e.g. an unrelated section) must not suppress the lookup.
+    relevant_regs = sum(
+        c.doc["source_kind"] == "regulation" and (c.rerank_score or 0) >= max(bar, s.policy_pairing_threshold)
+        for c in selected
+    )
     if (
-        compare is not False and source_kind is None and _COMPARISON.search(query)
-        and selected and selected[0].doc["source_kind"] == "internal"
-        and sum(c.doc["source_kind"] == "regulation" for c in selected) < 2
+        compare is not False and source_kind is None
+        and selected and selected[0].doc["source_kind"] == "internal" and relevant_regs < 1
     ):
         reg = retrieve(selected[0].text[:800], user, as_of, strategy=strategy,
                        source_kind="regulation", top_n=3, compare=False)
-        reg_hits = [c for c in reg.candidates
-                    if c.chunk_id not in {s.chunk_id for s in selected}
-                    and (c.rerank_score or 0) >= s.abstain_threshold]
+        have = {c.chunk_id for c in selected}
+        reg_hits = [c for c in reg.candidates if c.chunk_id not in have and (c.rerank_score or 0) >= bar]
         if reg_hits:
             keep = max(top_n - len(reg_hits), 2)
             selected = selected[:keep] + reg_hits
-            timings["comparison_lookup"] = sum(reg.timings_ms.values())
+            timings["policy_law_lookup"] = sum(reg.timings_ms.values())
 
     return RetrievalResult(
         query=query, as_of=as_of, candidates=selected, timings_ms=timings,

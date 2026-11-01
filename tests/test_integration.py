@@ -149,3 +149,10 @@ def test_chat_history_is_private_masked_and_rechecks_permissions(corpus, fake_ll
 
         assert client.post(f"/conversations/{conv}/delete", headers=nida).json()["ok"]
         assert client.get(f"/conversations/{conv}", headers=nida).status_code == 404
+
+
+def test_policy_question_also_brings_the_governing_law(corpus):
+    # regression (held-out): "how many days to answer an access request" was answered with the
+    # internal policy's 45 days because PDPA s.30 (30 days) was not in the context
+    r = retrieve("ลูกค้าโทรมาขอดูข้อมูลส่วนตัวทั้งหมดที่ธนาคารเก็บไว้ เราต้องส่งให้ภายในกี่วัน", EMPLOYEE)
+    assert any(c.document_id == "pdpa-2562" and c.label.startswith("มาตรา 30") for c in r.candidates)
