@@ -48,7 +48,8 @@ export default function LoginPage() {
     });
     if (!res.ok) {
       setLoading(false);
-      setError((await res.json()).detail ?? "เข้าสู่ระบบไม่สำเร็จ");
+      const data = await res.json().catch(() => null);
+      setError(data?.detail ?? "เข้าสู่ระบบไม่สำเร็จ");
       setShake((n) => n + 1);
       return;
     }
@@ -65,7 +66,7 @@ export default function LoginPage() {
       <div className="hairline-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(75%_65%_at_50%_10%,black,transparent)]" />
       <div className="spotlight pointer-events-none absolute inset-0" />
 
-      <header className="enter relative flex items-center justify-between px-8 py-6" style={d(0)}>
+      <header className="enter relative flex items-center justify-between px-4 py-4 md:px-8 md:py-6" style={d(0)}>
         <div className="flex items-center gap-2.5 text-[15px] font-semibold">
           <span className="flex size-7 items-center justify-center rounded-lg bg-foreground text-background">
             <Scale className="size-4" />
@@ -75,15 +76,15 @@ export default function LoginPage() {
         <span className="text-sm text-muted-foreground">Thai Banking & Securities</span>
       </header>
 
-      <main className="relative mx-auto grid max-w-6xl items-center gap-14 px-8 pb-16 pt-6 lg:grid-cols-[1.15fr_1fr] lg:pt-12">
+      <main className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pb-12 pt-2 md:px-8 lg:gap-14 lg:pb-16 lg:pt-12 lg:grid-cols-[1.15fr_1fr] ">
         <section>
           <div className="enter mb-6 inline-flex items-center gap-2 rounded-full border bg-card/60 px-3 py-1 text-xs text-muted-foreground backdrop-blur" style={d(80)}>
             <span className="pulse-ring size-1.5 rounded-full bg-brand" />
             PDPA · AMLA · กฎกระทรวง CDD · ธปท. · ก.ล.ต.
           </div>
-          <h1 className="text-4xl font-semibold leading-[1.15] tracking-tight sm:text-5xl xl:text-[56px]">
-            <span className="enter block whitespace-nowrap" style={d(160)}>คำตอบด้าน Compliance</span>
-            <span className="enter block whitespace-nowrap" style={d(260)}>
+          <h1 className="text-3xl font-semibold leading-[1.2] tracking-tight sm:text-5xl xl:text-[56px]">
+            <span className="enter block sm:whitespace-nowrap" style={d(160)}>คำตอบด้าน Compliance</span>
+            <span className="enter block sm:whitespace-nowrap" style={d(260)}>
               <span className="text-shimmer">ที่ตรวจสอบได้ทุกประโยค</span>
             </span>
           </h1>
@@ -107,9 +108,9 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <section className="enter" style={d(300)}>
+        <section className="enter order-first lg:order-none" style={d(300)}>
           <div key={shake} className={shake ? "animate-[shake_0.4s_ease-in-out]" : undefined}>
-            <div className="glow-shell border-spin p-7">
+            <div className="glow-shell border-spin p-5 sm:p-7">
               <h2 className="text-xl font-semibold">เข้าสู่ระบบ</h2>
               <p className="mt-1 text-sm text-muted-foreground">ใช้บัญชีพนักงานของธนาคาร</p>
               <form onSubmit={submit} className="mt-6 space-y-3">

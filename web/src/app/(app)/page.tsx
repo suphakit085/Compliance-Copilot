@@ -10,6 +10,7 @@ import { useUser } from "@/components/app-shell";
 import { useToday } from "@/lib/use-today";
 import { Answer } from "@/components/chat/answer";
 import { SourceCard } from "@/components/chat/source-card";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 type Msg = { role: "user"; content: string } | { role: "assistant"; content: string; response: ChatResponse };
 
@@ -81,14 +82,14 @@ function Composer({
         }}
         rows={big ? 3 : 1}
         placeholder="ถามเรื่องกฎหมาย ประกาศ หรือนโยบายภายใน…"
-        className="block max-h-48 w-full resize-none bg-transparent px-2 py-1.5 text-[15px] outline-none placeholder:text-muted-foreground/70"
+        className="block max-h-40 w-full resize-none bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-muted-foreground/70 sm:text-[15px]"
       />
       <div className="mt-2 flex items-center justify-between gap-2">
         <label
           className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-muted-foreground transition hover:bg-white/5"
           title="ตอบตามกฎ/นโยบายที่มีผลบังคับ ณ วันที่เลือก"
         >
-          <CalendarClock className="size-3.5" /> ตามกฎ ณ วันที่
+          <CalendarClock className="size-3.5" /> <span className="hidden sm:inline">ตามกฎ ณ วันที่</span>
           <input
             type="date"
             value={asOf}
@@ -120,6 +121,7 @@ export default function ChatPage() {
   const [selected, setSelected] = useState<{ msg: number; source: string | null } | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [sheetOpen, setSheetOpen] = useState(false); // sources drawer on phones/tablets
 
   const lastAssistant = [...messages.keys()].reverse().find((k) => messages[k].role === "assistant");
   const panelMsg = selected?.msg ?? lastAssistant;
@@ -156,10 +158,57 @@ export default function ChatPage() {
     }
   }
 
-  function cite(msgIndex: number, id: string) {
+  function cite(msgIndex: number, id: string | null) {
     setSelected({ msg: msgIndex, source: id });
-    setTimeout(() => cardRefs.current[`${msgIndex}-${id}`]?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    const wide = window.matchMedia("(min-width: 1280px)").matches;
+    if (!wide) setSheetOpen(true);
+    if (id) {
+      const key = `${wide ? "panel" : "sheet"}-${msgIndex}-${id}`;
+      setTimeout(() => cardRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "center" }), wide ? 50 : 300);
+    }
   }
+
+  function renderSources(prefix: "panel" | "sheet") {
+    if (!panel) {
+      return (
+        <div className="px-4 pt-16 text-center">
+          <div className="mx-auto mb-4 flex size-10 items-center justify-center rounded-xl border bg-card">
+            <BookMarked className="size-4 text-muted-foreground" />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            ข้อความต้นฉบับที่ใช้ตอบจะแสดงที่นี่
+            <br />
+            พร้อมไฮไลต์ประโยคที่ถูกอ้างอิง
+          </p>
+        </div>
+      );
+    }
+    if (panel.sources.length === 0) {
+      return <p className="px-2 pt-6 text-center text-sm text-muted-foreground">ไม่มีเอกสารอ้างอิงสำหรับคำตอบนี้</p>;
+    }
+    return [...panel.sources]
+      .sort((a, b) => Number(b.cited) - Number(a.cited))
+      .map((s) => (
+        <SourceCard
+          key={s.id}
+          ref={(el) => { cardRefs.current[`${prefix}-${panelMsg}-${s.id}`] = el; }}
+          source={s}
+          active={selected?.msg === panelMsg && selected?.source === s.id}
+          onSelect={() => setSelected({ msg: panelMsg!, source: s.id })}
+        />
+      ));
+  }
+
+  const sourcesHeader = (
+    <>
+      <BookMarked className="size-4 text-brand" /> แหล่งอ้างอิง
+      {panel && (
+        <span className="text-xs font-normal text-muted-foreground">
+          · ใช้ตอบ {panel.sources.filter((s) => s.cited).length} จาก {panel.sources.length}
+        </span>
+      )}
+    </>
+  );
 
   const verifiedOf = (r: ChatResponse) => new Set(r.sources.filter((s) => s.cited).map((s) => s.id));
   const empty = messages.length === 0;
@@ -169,7 +218,7 @@ export default function ChatPage() {
       <div className="relative flex min-w-0 flex-1 flex-col">
         {empty && <div className="aurora pointer-events-none absolute inset-x-0 top-0 h-[520px]" />}
 
-        <div className="relative flex items-center justify-between px-8 py-4">
+        <div className="relative flex items-center justify-between px-4 py-3 md:px-8 md:py-4">
           <div className="text-sm text-muted-foreground">
             {user ? `สวัสดี ${user.display_name.split(" ")[0]}` : " "}
           </div>
@@ -184,25 +233,25 @@ export default function ChatPage() {
         </div>
 
         {empty ? (
-          <div className="relative flex flex-1 flex-col items-center overflow-y-auto px-6 pb-10 pt-[8vh]">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1 text-xs text-muted-foreground backdrop-blur">
+          <div className="relative flex flex-1 flex-col items-center overflow-y-auto px-4 pb-10 pt-[4vh] sm:px-6 sm:pt-[8vh]">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1 text-[11px] text-muted-foreground backdrop-blur sm:mb-6 sm:text-xs">
               <span className="size-1.5 rounded-full bg-brand shadow-[0_0_8px_#0099ff]" />
               ทุกคำตอบอ้างอิงถึงระดับมาตรา และตรวจกับต้นฉบับแล้ว
             </div>
-            <h1 className="max-w-3xl text-center text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+            <h1 className="max-w-3xl text-center text-[28px] font-semibold leading-tight tracking-tight sm:text-5xl">
               ถามเรื่องกฎระเบียบ
               <br />
               <span className="text-muted-foreground">ได้คำตอบพร้อมหลักฐาน</span>
             </h1>
-            <div className="mt-10 w-full max-w-2xl">
+            <div className="mt-7 w-full max-w-2xl sm:mt-10">
               <Composer value={input} onChange={setInput} onSubmit={() => send(input)} loading={loading} asOf={asOf} setAsOf={setAsOf} autoFocus big />
             </div>
-            <div className="mt-8 grid w-full max-w-2xl gap-3 sm:grid-cols-2">
+            <div className="mt-6 grid w-full max-w-2xl gap-2.5 sm:mt-8 sm:grid-cols-2 sm:gap-3">
               {EXAMPLES.map((e) => (
                 <button
                   key={e.q}
                   onClick={() => send(e.q)}
-                  className="group panel flex flex-col gap-2 p-4 text-left transition hover:border-brand/40 hover:bg-white/[0.03]"
+                  className="group panel flex flex-col gap-1.5 p-3.5 text-left transition hover:border-brand/40 hover:bg-white/[0.03] sm:gap-2 sm:p-4"
                 >
                   <span className="flex items-center gap-2 text-xs text-muted-foreground">
                     <e.icon className="size-3.5 text-brand" /> {e.tag}
@@ -215,21 +264,21 @@ export default function ChatPage() {
         ) : (
           <>
             <div className="flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-3xl space-y-8 px-6 py-6">
+              <div className="mx-auto max-w-3xl space-y-6 px-3 py-4 sm:space-y-8 sm:px-6 sm:py-6">
                 {messages.map((m, i) =>
                   m.role === "user" ? (
                     <div key={i} className="flex justify-end">
-                      <div className="max-w-[85%] rounded-[18px] rounded-br-md bg-secondary px-4 py-2.5 text-[15px]">
+                      <div className="max-w-[88%] rounded-[18px] rounded-br-md bg-secondary px-4 py-2.5 text-[15px]">
                         {m.content}
                       </div>
                     </div>
                   ) : (
                     <div key={i} className="flex gap-3">
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-foreground text-background">
+                      <div className="hidden size-8 shrink-0 items-center justify-center rounded-[9px] bg-foreground text-background sm:flex">
                         <Scale className="size-4" />
                       </div>
                       <div
-                        className={cn("panel min-w-0 flex-1 p-5 transition", panelMsg === i && "border-brand/30")}
+                        className={cn("panel min-w-0 flex-1 p-4 transition sm:p-5", panelMsg === i && "border-brand/30")}
                         onClick={() => setSelected((s) => (s?.msg === i ? s : { msg: i, source: null }))}
                       >
                         <Answer
@@ -239,25 +288,34 @@ export default function ChatPage() {
                           onCite={(id) => cite(i, id)}
                           onFollowUp={send}
                         />
+                        {m.response.sources.length > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); cite(i, null); }}
+                            className="mt-3 flex w-full items-center justify-center gap-2 rounded-[10px] border bg-secondary/50 py-2 text-xs text-muted-foreground transition hover:text-foreground xl:hidden"
+                          >
+                            <BookMarked className="size-3.5 text-brand" />
+                            ดูแหล่งอ้างอิง ({m.response.sources.filter((s) => s.cited).length} รายการที่ใช้ตอบ)
+                          </button>
+                        )}
                       </div>
                     </div>
                   ),
                 )}
                 {loading && (
                   <div className="flex gap-3">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-foreground text-background">
+                    <div className="hidden size-8 shrink-0 items-center justify-center rounded-[9px] bg-foreground text-background sm:flex">
                       <Scale className="size-4" />
                     </div>
-                    <div className="panel flex-1 p-5"><Thinking /></div>
+                    <div className="panel flex-1 p-4 sm:p-5"><Thinking /></div>
                   </div>
                 )}
                 <div ref={bottom} />
               </div>
             </div>
-            <div className="px-6 pb-5 pt-2">
+            <div className="px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-6 sm:pb-5">
               <div className="mx-auto max-w-3xl">
                 <Composer value={input} onChange={setInput} onSubmit={() => send(input)} loading={loading} asOf={asOf} setAsOf={setAsOf} />
-                <p className="mt-2.5 text-center text-[11px] text-muted-foreground">
+                <p className="mt-2 hidden text-center text-[11px] text-muted-foreground sm:block">
                   ข้อมูลส่วนบุคคลในคำถามจะถูกปิดบังก่อนประมวลผล · คำตอบเป็นข้อมูลประกอบการตัดสินใจ ไม่ใช่ความเห็นทางกฎหมาย
                 </p>
               </div>
@@ -267,44 +325,20 @@ export default function ChatPage() {
       </div>
 
       <aside className="hidden w-[420px] shrink-0 flex-col border-l bg-sidebar xl:flex">
-        <div className="flex items-center gap-2 border-b px-5 py-4 text-sm font-medium">
-          <BookMarked className="size-4 text-brand" /> แหล่งอ้างอิง
-          {panel && (
-            <span className="text-xs font-normal text-muted-foreground">
-              · ใช้ตอบ {panel.sources.filter((s) => s.cited).length} จาก {panel.sources.length}
-            </span>
-          )}
-        </div>
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
-          {!panel && (
-            <div className="px-4 pt-16 text-center">
-              <div className="mx-auto mb-4 flex size-10 items-center justify-center rounded-xl border bg-card">
-                <BookMarked className="size-4 text-muted-foreground" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                ข้อความต้นฉบับที่ใช้ตอบจะแสดงที่นี่
-                <br />
-                พร้อมไฮไลต์ประโยคที่ถูกอ้างอิง
-              </p>
-            </div>
-          )}
-          {panel && panel.sources.length === 0 && (
-            <p className="px-2 pt-6 text-center text-sm text-muted-foreground">ไม่มีเอกสารอ้างอิงสำหรับคำตอบนี้</p>
-          )}
-          {panel &&
-            [...panel.sources]
-              .sort((a, b) => Number(b.cited) - Number(a.cited))
-              .map((s) => (
-                <SourceCard
-                  key={s.id}
-                  ref={(el) => { cardRefs.current[`${panelMsg}-${s.id}`] = el; }}
-                  source={s}
-                  active={selected?.msg === panelMsg && selected?.source === s.id}
-                  onSelect={() => setSelected({ msg: panelMsg!, source: s.id })}
-                />
-              ))}
-        </div>
+        <div className="flex items-center gap-2 border-b px-5 py-4 text-sm font-medium">{sourcesHeader}</div>
+        <div className="flex-1 space-y-3 overflow-y-auto p-4">{renderSources("panel")}</div>
       </aside>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[85dvh] gap-0 rounded-t-2xl p-0">
+          <SheetTitle className="flex items-center gap-2 border-b px-4 py-3.5 pr-12 text-sm font-medium">
+            {sourcesHeader}
+          </SheetTitle>
+          <div className="space-y-3 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {renderSources("sheet")}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
