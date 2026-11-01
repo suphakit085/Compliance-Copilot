@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           version: "0.12.13"
           python-version: "3.12"
@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           version: "0.12.13"
       - name: Python (pip-audit; PyTorch/CUDA wheels come from their own index and are tracked separately)
