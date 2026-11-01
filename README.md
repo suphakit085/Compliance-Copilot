@@ -17,7 +17,7 @@ citation is *checked against the source text by code* before it is shown.
   </tr>
   <tr>
     <td><img src="docs/images/audit.png" alt="Hash-chained audit trail"/></td>
-    <td><img src="docs/images/login.png" alt="Login"/></td>
+    <td><img src="docs/images/streaming-draft.png" alt="Streaming draft before verification"/></td>
   </tr>
 </table>
 
