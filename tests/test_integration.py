@@ -100,6 +100,9 @@ def test_api_enforces_roles(corpus, fake_llm):
         r = client.post("/chat", headers=emp, json={"question": "ต้องเก็บข้อมูล CDD กี่ปีหลังปิดบัญชี"}).json()
         assert r["status"] == "answered" and r["audit_id"]
         assert client.get("/audit/verify", headers=login("kittipong", "demo-auditor")).json()["valid"]
+        # tests share the dev database: do not leave fake answers in the user's chat history
+        if r.get("conversation_id"):
+            client.post(f"/conversations/{r['conversation_id']}/delete", headers=emp)
 
 
 def test_comparison_question_brings_in_the_governing_law(corpus):
