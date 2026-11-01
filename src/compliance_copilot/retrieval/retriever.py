@@ -15,6 +15,7 @@ Every first-stage query carries the same WHERE clause:
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import date
@@ -26,6 +27,9 @@ from ..config import get_settings
 from ..db import engine
 from . import bm25, models
 from .text_index import expand_query, explicit_references, query_terms
+
+# Questions asking whether internal policy matches the law.
+_COMPARISON = re.compile(r"สอดคล้อง|ขัด(กับ|ต่อ)?|เป็นไปตาม|ตรงตาม|ถูกต้องตามกฎหมาย|ผิดกฎหมาย|ฝ่าฝืน|compl(y|iant|iance)", re.I)
 
 
 @dataclass
@@ -140,6 +144,7 @@ def retrieve(
     use_refs: bool = True,
     use_rerank: bool = True,
     use_glossary: bool = True,
+    compare: bool | None = None,
     top_n: int | None = None,
     source_kind: str | None = None,
     doc_ids: list[str] | None = None,
@@ -250,6 +255,25 @@ def retrieve(
         timings["rerank"] = int((time.perf_counter() - t0) * 1000)
 
     selected = fused[:top_n]
+
+    # "Does our policy comply with the law?" - the reranker favours the policy the question
+    # names, so the governing regulation can fall out of the context. Look it up with the
+    # policy clause itself (as gap analysis does) and reserve slots for it.
+    if (
+        compare is not False and source_kind is None and _COMPARISON.search(query)
+        and selected and selected[0].doc["source_kind"] == "internal"
+        and sum(c.doc["source_kind"] == "regulation" for c in selected) < 2
+    ):
+        reg = retrieve(selected[0].text[:800], user, as_of, strategy=strategy,
+                       source_kind="regulation", top_n=3, compare=False)
+        reg_hits = [c for c in reg.candidates
+                    if c.chunk_id not in {s.chunk_id for s in selected}
+                    and (c.rerank_score or 0) >= s.abstain_threshold]
+        if reg_hits:
+            keep = max(top_n - len(reg_hits), 2)
+            selected = selected[:keep] + reg_hits
+            timings["comparison_lookup"] = sum(reg.timings_ms.values())
+
     return RetrievalResult(
         query=query, as_of=as_of, candidates=selected, timings_ms=timings,
         notices=version_notices(selected, as_of), terms=terms, expansions=expansions,

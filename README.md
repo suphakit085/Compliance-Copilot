@@ -42,7 +42,7 @@ Retrieval ablation on the golden set (answerable questions, top-6 context, RTX 4
 | C. Structure-aware chunks + BM25 only | 0.50 | 0.825 | 0.787 | 0.622 | 0 |
 | D. Hybrid (vector + BM25 + references, RRF) | 0.625 | 0.900 | 0.887 | 0.740 | 0 |
 | E. Hybrid + cross-encoder rerank | 0.85 | 0.975 | 0.963 | 0.891 | 0 |
-| **F. E + domain glossary expansion (production)** | **0.85** | **1.000** | **0.988** | **0.900** | **0** |
+| **F. E + glossary expansion + comparison lookup (production)** | **0.85** | **1.000** | **1.000** | **0.900** | **0** |
 
 - Chunking by legal unit (มาตรา/ข้อ) instead of fixed windows is the single biggest win.
 - The reranker separates in-corpus from out-of-corpus questions cleanly (lowest answerable
@@ -53,10 +53,22 @@ Retrieval ablation on the golden set (answerable questions, top-6 context, RTX 4
   PDPA มาตรา 26 never uses that word. Because the fix was informed by this set, F's last
   points should be confirmed on held-out questions.
 
-End-to-end on the first 11 questions with Gemini 3.5 Flash (the free-tier daily quota ended
-the run; it resumes from cache): key-fact accuracy 100%, quote verification 100% (every
-cited quote found verbatim in its source), 0 leakage. The one miss was the glossary case
-above - the model answered "insufficient evidence" rather than guessing.
+End-to-end on all 51 questions with Gemini 3.1 Flash Lite:
+
+| Metric | Result |
+|---|---|
+| Correct behaviour (answer / abstain / block) | **100%** |
+| Key facts correct in answers | **100%** |
+| Cited quotes found verbatim in the cited source | 97.4% |
+| Gold evidence cited (citation recall) | 98.8% |
+| Confidential-document leakage | **0** |
+| PII masked before the LLM | 100% |
+| Latency p50 / p95 | 3.5 s / 8.8 s |
+
+The first full run scored 96% and exposed two real defects, both fixed with regression
+tests: the injection filter blocked a legitimate question containing "ยกเลิกกฎกระทรวง"
+(legal wording), and a "does our policy comply with the law?" question retrieved only the
+policy. Comparison questions now also look up the regulation governing the policy clause.
 
 Policy Gap Analysis on the synthetic PDPA policy found both planted conflicts (breach
 notification "7 days" vs 72 hours in มาตรา 37(4); access requests "45 days" vs 30 days in
