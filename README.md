@@ -58,7 +58,7 @@ citation is *checked against the source text by code* before it is shown.
   the UI, and `copilot check-updates` detects when a regulator changes a pinned source.
 - **Policy Gap Analysis** — checks each clause of an internal policy against the
   regulations in force and produces a reviewable worklist with verified citations.
-- **Evaluation harness** — 51-question golden set plus a 21-question held-out set,
+- **Evaluation harness** — 218 questions in three sets (golden 51, held-out 21, extended 146),
   deterministic metrics, retrieval ablation, threshold calibration.
 
 ## Results
@@ -133,9 +133,34 @@ after-fix column is not, since the fixes were informed by this set. Reports:
 [`docs/eval-report-holdout-blind.md`](docs/eval-report-holdout-blind.md),
 [`docs/eval-report-holdout.md`](docs/eval-report-holdout.md).
 
-Policy Gap Analysis on the synthetic PDPA policy found both planted conflicts (breach
-notification "7 days" vs 72 hours in มาตรา 37(4); access requests "45 days" vs 30 days in
-มาตรา 30) plus six genuine omissions, each with a quote verified against the Act.
+### Extended set - 146 more questions, first run blind
+
+Written after all tuning, from the statute text, across all 14 documents (colloquial wording, versions
+by date, access control, refusals, prompt injection, personal data):
+
+| | Result |
+|---|---|
+| Retrieval Hit@6, production, **first (blind) run** | 92.2% (baseline 51.6%) |
+| Retrieval Hit@6 after six vocabulary fixes (**no longer blind**) | 97.7% |
+| End-to-end correct behaviour | 94.5% |
+| End-to-end key facts | 91.4% as run, 93.8% after correcting three over-strict expected wordings |
+| Cited quotes verified / leakage / personal data masked | 95.9% / 0 / 100% |
+
+The 8 behaviour misses are listed in [`docs/evaluation.md`](docs/evaluation.md): 4 answers whose quotes
+could not be verified (the system fell back to source text), 2 answerable questions refused, and 2
+access-control cases where the system said the detail was unavailable and answered from permitted
+documents instead of refusing outright (nothing confidential was disclosed). End-to-end was run with the
+batch model because the chat model's daily quota was used up.
+
+**No question is expert-confirmed yet (0 of 218).** `copilot eval-review export` produces a workbook for
+the compliance team, `import` records their verdicts (a later edit makes a verdict stale), and
+`copilot feedback-report --draft` turns a thumbs-down into a question skeleton for an expert.
+
+Policy Gap Analysis now reads each regulation together with the Act it is issued under and tells the model
+the legal level of every source. On the synthetic PDPA policy it found both planted conflicts (breach
+notification "7 days" vs 72 hours in มาตรา 37(4), citing the Act and the PDPC notification; access
+requests "45 days" vs 30 days in มาตรา 30) plus four omissions and one arguable high-severity finding
+(clause 3 vs มาตรา 26) for the compliance team to judge.
 
 Full report: [`docs/eval-report.md`](docs/eval-report.md).
 
@@ -229,13 +254,14 @@ Useful commands:
 uv run copilot ask "ต้องเก็บข้อมูล CDD กี่ปีหลังปิดบัญชี" --user somchai
 uv run copilot gap pol-pdpa-001 --out gap.md
 uv run copilot eval --no-e2e          # retrieval ablation only (no LLM calls)
-uv run copilot eval --set holdout     # held-out set
+uv run copilot eval --set holdout     # held-out set (also: --set extended, --reviewed-only, --production-only)
+uv run copilot eval-review status     # how much of each set an expert has confirmed
 uv run copilot audit-verify
 uv run copilot add-policy my-policy.md --dry-run   # validate + preview a real policy before adding it
 uv run copilot check-updates          # has a regulator changed a pinned source? (read-only)
 uv run copilot governance             # reviews due, drafts, sample documents still in the corpus
 uv run copilot bench                  # retrieval capacity on this machine (no LLM)
-uv run pytest                         # 123 tests (integration tests need the DB)
+uv run pytest                         # 541 tests (integration tests need the DB)
 ```
 
 A scripted 4-minute demo walkthrough is in [`docs/demo-script.md`](docs/demo-script.md).
@@ -266,9 +292,9 @@ deliberately planted gaps for the gap-analysis demo.
   needs (e.g. the Securities and Exchange Act, banking-supervision notifications), is the organisation's
   decision - see `docs/governance.md`. `check-updates` reports a source as *unreachable* rather than
   unchanged when the publisher blocks it.
-- Gold and held-out sets (72 questions) were written by one person; a production rollout
-  needs questions sampled from real compliance queries and reviewed by the compliance team,
-  and a fresh blind set after every round of fixes.
+- All 218 evaluation questions were written by engineers and none is expert-confirmed yet;
+  a production rollout needs questions sampled from real compliance queries, confirmed by the
+  compliance team (workflow: `docs/evaluation.md`), and a fresh blind set after every round of fixes.
 - End-to-end metrics depend on LLM quota; run `uv run copilot eval` (results are cached
   so interrupted runs resume).
 - Vocabulary gaps between how staff ask and how statutes are worded are handled by a
@@ -294,6 +320,6 @@ src/compliance_copilot/
   audit.py · security.py · evaluation.py · llm.py · cli.py
 web/           Next.js + shadcn/ui frontend (BFF proxy, chat, documents, gap, audit, eval)
 data/          sources.yaml (manifest) · internal/ (synthetic policies)
-eval/          golden_set.yaml · holdout_set.yaml · results/
+eval/          golden_set.yaml · holdout_set.yaml · extended/ · review/ (expert verdicts) · results/
 tests/         unit + integration tests
 ```
