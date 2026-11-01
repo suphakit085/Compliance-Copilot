@@ -47,7 +47,7 @@ jobs:
           uv export --frozen --no-dev --no-hashes --no-emit-project \
             | grep -Ev '^(torch|nvidia-|cuda-|triton|pytorch-triton)' > requirements.txt
           uvx pip-audit -r requirements.txt --no-deps --disable-pip
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Web (production dependencies, high severity and above)
