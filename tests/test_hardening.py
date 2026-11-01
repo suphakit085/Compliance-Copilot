@@ -128,3 +128,26 @@ def test_production_refuses_unsafe_defaults(client, monkeypatch):
     monkeypatch.setattr(s, "env", "development")
     monkeypatch.setattr(s, "jwt_secret", "dev-only-change-me")
     security.check_production_ready()  # laptops stay easy
+
+
+def test_create_user_enforces_basic_rules_and_never_stores_the_password(corpus):
+    from compliance_copilot.db import User, session
+
+    with pytest.raises(ValueError, match="at least"):
+        security.create_user("zz-new-admin", "x", "admin", "it", "restricted", "short")
+    with pytest.raises(ValueError, match="role"):
+        security.create_user("zz-new-admin", "x", "superuser", "it", "restricted", "a-long-enough-password")
+    with pytest.raises(ValueError, match="clearance"):
+        security.create_user("zz-new-admin", "x", "admin", "it", "top-secret", "a-long-enough-password")
+    try:
+        security.create_user("zz-new-admin", "Ops", "admin", "it", "restricted", "a-long-enough-password")
+        with pytest.raises(ValueError, match="already exists"):
+            security.create_user("zz-new-admin", "Ops", "admin", "it", "restricted", "another-long-password")
+        security.create_user("zz-new-admin", "Ops", "admin", "it", "restricted", "another-long-password", update=True)
+        assert security.authenticate("zz-new-admin", "another-long-password").role == "admin"
+        with session() as db:
+            stored = db.query(User).filter_by(username="zz-new-admin").one().password_hash
+        assert "another-long-password" not in stored and stored.startswith("scrypt$")
+    finally:
+        with engine().begin() as c:
+            c.execute(text("DELETE FROM users WHERE username = 'zz-new-admin'"))

@@ -174,7 +174,7 @@ flowchart LR
 | API | FastAPI, JWT, role-based endpoints | Authorisation lives server-side; the UI is untrusted |
 | Web | Next.js 16 + shadcn/ui, BFF proxy with httpOnly cookie | Session token is never readable by browser JavaScript |
 
-Details and design decisions: [`docs/architecture.md`](docs/architecture.md). Roles, intake rules and decisions the organisation must make: [`docs/governance.md`](docs/governance.md) (Thai).
+Details and design decisions: [`docs/architecture.md`](docs/architecture.md). Containers, CI, monitoring, backups and measured capacity: [`docs/deployment.md`](docs/deployment.md). Roles, intake rules and decisions the organisation must make: [`docs/governance.md`](docs/governance.md) (Thai).
 
 ## Thai document processing — the unglamorous part that matters
 
@@ -234,7 +234,8 @@ uv run copilot audit-verify
 uv run copilot add-policy my-policy.md --dry-run   # validate + preview a real policy before adding it
 uv run copilot check-updates          # has a regulator changed a pinned source? (read-only)
 uv run copilot governance             # reviews due, drafts, sample documents still in the corpus
-uv run pytest                         # 116 tests (integration tests need the DB)
+uv run copilot bench                  # retrieval capacity on this machine (no LLM)
+uv run pytest                         # 123 tests (integration tests need the DB)
 ```
 
 A scripted 4-minute demo walkthrough is in [`docs/demo-script.md`](docs/demo-script.md).
@@ -275,6 +276,9 @@ deliberately planted gaps for the gap-analysis demo.
 - SSO is tested against Keycloak and a fake provider; a real bank IdP (Entra ID, Okta) needs
   its group claim name checked, session logout (single logout) and token refresh. RLS covers
   document reads; user-owned tables (chat history, feedback) are still protected in the API only.
+- Capacity: one API process handles about 2 questions/second of retrieval on an 8 GB GPU (the models
+  sit behind one lock); CPU-only is ~20x slower and only fit for demos. Scale with one replica per
+  GPU - see `docs/deployment.md`. The CI workflows pass `actionlint` but have not yet run on GitHub.
 - Production hardening: an on-prem LLM option for data residency, scheduled re-ingestion when regulators publish amendments.
 
 ## Project layout

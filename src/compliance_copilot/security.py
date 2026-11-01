@@ -59,6 +59,33 @@ def seed_users(path=None) -> int:
     return n
 
 
+ROLES = ("employee", "compliance_officer", "auditor", "admin")
+MIN_PASSWORD = 12
+
+
+def create_user(username: str, display_name: str, role: str, department: str, clearance: str,
+                password: str, update: bool = False) -> None:
+    """Create a local account (for the first admin of a deployment, or break-glass access when SSO
+    is down). Day-to-day users should come from the identity provider."""
+    if role not in ROLES:
+        raise ValueError(f"role must be one of {', '.join(ROLES)}")
+    if clearance not in CLEARANCE:
+        raise ValueError(f"clearance must be one of {', '.join(CLEARANCE)}")
+    if len(password) < MIN_PASSWORD:
+        raise ValueError(f"password must be at least {MIN_PASSWORD} characters")
+    init_db()
+    with session() as db:
+        u = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+        if u and not update:
+            raise ValueError(f"user '{username}' already exists (use --update to change it)")
+        u = u or User(username=username)
+        u.display_name, u.role, u.department = display_name, role, department
+        u.clearance, u.active = CLEARANCE[clearance], True
+        u.password_hash = hash_password(password)
+        u.failed_logins, u.locked_until = 0, None
+        db.add(u)
+
+
 def to_context(u: User) -> UserContext:
     return UserContext(u.id, u.username, u.role, u.department, u.clearance, u.display_name)
 

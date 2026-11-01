@@ -3,9 +3,11 @@ an untrusted client."""
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import threading
+import time
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -13,12 +15,12 @@ from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 
-from .. import __version__, audit, governance, history, llm, sso
+from .. import __version__, audit, governance, history, llm, observability, sso
 from ..config import ROOT, get_settings
 from ..db import AuditLog, Chunk, Document, Feedback, as_reader, engine, init_db, session
 from ..features import gap_analysis
@@ -42,10 +44,35 @@ _bearer = HTTPBearer(auto_error=False)
 _models_ready = threading.Event()
 
 
+def _verify_audit_once() -> None:
+    log = logging.getLogger("audit.watchdog")
+    try:
+        r = audit.verify_chain()
+        observability.AUDIT_VALID.set(1 if r["valid"] else 0)
+        observability.AUDIT_ROWS.set(r["checked"])
+        observability.AUDIT_CHECKED_AT.set(time.time())
+        if not r["valid"]:
+            log.error("audit chain verification FAILED", extra={"fields": r})
+    except Exception:
+        log.exception("audit chain verification could not run")
+
+
+def _audit_watchdog(interval_s: float) -> None:
+    """Re-verify the audit hash chain on a schedule and expose the result as a metric, so an
+    altered or deleted record raises an alert instead of waiting for someone to look."""
+    while True:
+        _verify_audit_once()
+        time.sleep(interval_s)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    s = get_settings()
+    observability.configure_logging(s.log_format, s.log_level)
     init_db()
     check_production_ready()
+    if s.audit_verify_minutes > 0:
+        threading.Thread(target=_audit_watchdog, args=(s.audit_verify_minutes * 60,), daemon=True).start()
     history.purge_expired()
 
     def warm() -> None:  # load embedding + reranker models in the background
@@ -66,6 +93,28 @@ app = FastAPI(
 
 
 @app.middleware("http")
+async def observe(request: Request, call_next):
+    """Request id, access log and HTTP metrics. Only the route template is recorded - never
+    the query string, body or the ids inside paths."""
+    rid = observability.new_request_id(request.headers.get("x-request-id"))
+    observability.request_id.set(rid)
+    started = time.perf_counter()
+    response = await call_next(request)
+    elapsed = time.perf_counter() - started
+    route = getattr(request.scope.get("route"), "path", "unmatched")
+    response.headers["X-Request-ID"] = rid
+    if route not in ("/metrics", "/health", "/ready"):
+        observability.HTTP.labels(request.method, route, str(response.status_code)).inc()
+        observability.HTTP_LATENCY.labels(route).observe(elapsed)
+        logging.getLogger("access").info(
+            f"{request.method} {route} {response.status_code}",
+            extra={"fields": {"method": request.method, "route": route, "status": response.status_code,
+                              "ms": int(elapsed * 1000)}},
+        )
+    return response
+
+
+@app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -81,6 +130,7 @@ if hosts := [h.strip() for h in get_settings().allowed_hosts.split(",") if h.str
 
 
 def _too_many(scope: str, retry_after: float, user: UserContext | None = None, first: bool = False) -> HTTPException:
+    observability.RATE_LIMITED.labels(scope).inc()
     if first:  # one audit record per violation window, so an attacker cannot flood the audit chain
         audit.log_event("rate_limited", {"scope": scope}, user)
     return HTTPException(
@@ -167,6 +217,7 @@ def login(body: LoginIn, request: Request) -> LoginOut:
     try:
         user = authenticate(body.username, body.password)
     except LoginLocked as e:
+        observability.LOGIN_FAILURES.labels("locked").inc()
         if e.newly_locked:
             audit.log_event("account_locked", {"username": e.username, "minutes": s.login_lock_minutes})
         raise HTTPException(
@@ -175,6 +226,7 @@ def login(body: LoginIn, request: Request) -> LoginOut:
             headers={"Retry-After": str(int(e.retry_after))},
         ) from e
     if not user:
+        observability.LOGIN_FAILURES.labels("wrong_password").inc()
         audit.log_event("login_failed", {"username": body.username})
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
     audit.log_event("login", {}, user)
@@ -479,6 +531,36 @@ def audit_verify(user: Annotated[UserContext, Depends(require(ROLES_AUDIT))]) ->
 
 
 # ----------------------------------------------------------------------- operations
+
+
+@app.get("/ready", tags=["ops"])
+def ready() -> dict[str, Any]:
+    """Readiness probe: 200 only when the database answers and the retrieval models are loaded
+    (the first start downloads them, which can take minutes). Use /health for liveness."""
+    db_ok = True
+    try:
+        with engine().connect() as c:
+            c.execute(text("SELECT 1"))
+    except Exception:
+        db_ok = False
+    models_ok = _models_ready.is_set()
+    if not (db_ok and models_ok):
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, {"database": db_ok, "models_ready": models_ok})
+    return {"ready": True}
+
+
+@app.get("/metrics", tags=["ops"], include_in_schema=False)
+def metrics(request: Request) -> Response:
+    """Prometheus scrape endpoint. Off unless COPILOT_METRICS_TOKEN is set; keep it on the
+    private network (the web tier's proxy does not forward it)."""
+    token = get_settings().metrics_token
+    given = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "metrics are disabled")
+    if not hmac.compare_digest(given, token):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token")
+    body, ctype = observability.render()
+    return Response(body, media_type=ctype)
 
 
 @app.get("/health", tags=["ops"])

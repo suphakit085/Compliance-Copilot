@@ -51,6 +51,7 @@ def fetch_sources(force: bool = False, log: Callable[[str], None] = print) -> No
             if prev.get("sha256") and prev["sha256"] != sha:
                 log(f"WARNING {d['id']}: content changed since last fetch - review before re-ingesting")
             lock[d["id"]] = {
+                **prev,  # keep fields written by other tools (checked_at from check-updates)
                 "url": d["url"],
                 "sha256": sha,
                 "bytes": target.stat().st_size,
