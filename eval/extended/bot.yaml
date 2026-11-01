@@ -1,0 +1,147 @@
+# Extended set - Bank of Thailand: Responsible Lending notification (เอกสารแนบ 1-8).
+# review: draft (see docs/evaluation-review.md)
+
+items:
+  - id: x-bot-01
+    category: regulation
+    user: somchai
+    question: ตอนเสนอขายสินเชื่อ ต้องแจ้งลูกค้าว่าถ้าผิดนัดชำระหนี้จะเกิดอะไรขึ้นบ้าง
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: แจ้งผลที่อาจเกิดขึ้นจากการผิดนัดชำระหนี้ โดยอย่างน้อยต้องแจ้งข้อมูลดังต่อไปนี้}
+    key_facts: [["ดอกเบี้ย", "เบี้ยปรับ"], ["ฟ้อง", "ดำเนินการตามกฎหมาย", "โอนขายหนี้", "บอกเลิกสัญญา"]]
+
+  - id: x-bot-02
+    category: regulation
+    user: somchai
+    question: คนมาค้ำประกันสินเชื่อ ต้องแจ้งอะไรเขาก่อนเซ็นสัญญา
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ต้องแจ้งผู้ค้ำประกันถึงสิทธิและขอบเขตความรับผิดชอบตามข้อสัญญาและกฎหมายที่เกี่ยวข้อง ก่อนผู้ค้ำประกันลงนามในสัญญา}
+    key_facts: [["สิทธิ"], ["ความรับผิดชอบ"]]
+
+  - id: x-bot-03
+    category: regulation
+    user: nida
+    question: การกำหนด KPI และเงินรางวัลจูงใจให้ทีมขายสินเชื่อ ธปท. กำหนดไว้อย่างไร
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ผู้ให้บริการต้องกำหนดโครงสร้างการจ่ายค่าตอบแทน}
+    key_facts: [["ค่าตอบแทน", "KPI"], ["รับผิดชอบ", "เป็นธรรม"]]
+
+  - id: x-bot-04
+    category: regulation
+    user: somchai
+    question: ต้องประเมินความสามารถในการชำระหนี้ของลูกค้าตอนไหนบ้าง
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ทั้งในขั้นตอนการอนุมัติสินเชื่อใหม่และการอนุมัติเพิ่มวงเงินสินเชื่อ}
+    key_facts: [["สินเชื่อใหม่", "อนุมัติ"], ["เพิ่มวงเงิน"]]
+
+  - id: x-bot-05
+    category: regulation
+    user: somchai
+    question: ตอนประเมินภาระหนี้ของลูกค้า ควรดูข้อมูลจากไหนบ้าง
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ข้อมูลภาระหนี้ของลูกหนี้ในข้อมูลเครดิต}
+    key_facts: [["ข้อมูลเครดิต", "เครดิต"], ["สลิปเงินเดือน", "เงินเดือน"]]
+
+  - id: x-bot-06
+    category: regulation
+    user: somchai
+    question: ลูกค้าอยากรวมค่าประกันภัยเข้าไปในวงเงินกู้ ธนาคารต้องทำอย่างไร
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ผู้ให้บริการต้องหารือกับลูกค้าและรวมค่าประกันภัยเป็นส่วนหนึ่งใน}
+    key_facts: [["ค่าประกันภัย", "ประกันภัย"], ["แผนชำระหนี้", "ค่างวด"]]
+
+  - id: x-bot-07
+    category: regulation
+    user: nida
+    question: ลูกหนี้ที่เริ่มมีปัญหาหนี้เรื้อรัง (general PD) หมายถึงลูกหนี้แบบไหน
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: จ่ายชำระดอกเบี้ยรวมมากกว่าเงินต้นรวมในช่วงย้อนหลังตั้งแต่ 3 ปีขึ้นไป แต่ไม่ถึง 5 ปี}
+    key_facts: [["3 ปี"], ["5 ปี"], ["ดอกเบี้ย"]]
+
+  - id: x-bot-08
+    category: regulation
+    user: nida
+    question: ลูกหนี้ของธนาคารที่เป็นหนี้เรื้อรังขั้นรุนแรง (severe PD) ต้องมีรายได้ต่อเดือนต่ำกว่าเท่าไร
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ซึ่งมีรายได้ต่อเดือนน้อยกว่า 20,000 บาท}
+    key_facts: [["20,000"]]
+
+  - id: x-bot-09
+    category: regulation
+    user: somchai
+    question: ต้องเตือนลูกค้าก่อนถึงวันครบกำหนดชำระหนี้ไหม
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ผู้ให้บริการต้องแจ้งเตือนลูกหนี้ให้ชำระหนี้ก่อนถึงกำหนดชำระหนี้}
+    key_facts: [["แจ้งเตือน"], ["ก่อนถึงกำหนด", "ก่อนครบกำหนด"]]
+
+  - id: x-bot-10
+    category: regulation
+    user: somchai
+    question: ลูกหนี้ที่กำลังถูกฟ้องขอทราบข้อมูลการดำเนินคดีของตัวเอง เราต้องให้ข้อมูลอะไรได้บ้าง
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ให้ผู้ให้บริการแจ้งข้อมูลดังกล่าวแก่ลูกหนี้ เช่น ภาระหนี้ที่เกี่ยวข้องกับการดำเนินคดี}
+    key_facts: [["แจ้ง"], ["ยอด", "ภาระหนี้"]]
+
+  - id: x-bot-11
+    category: regulation
+    user: nida
+    question: บริษัทที่รับซื้อหนี้ต้องพิจารณาเงื่อนไขผ่อนชำระของลูกหนี้อย่างไร
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ต้องพิจารณาเงื่อนไขการผ่อนชำระหนี้ของลูกหนี้ให้สอดคล้องกับความสามารถในการชำระหนี้ของลูกหนี้}
+    key_facts: [["ความสามารถในการชำระหนี้", "affordability"]]
+
+  - id: x-bot-12
+    category: regulation
+    user: nida
+    question: ออกแบบสินเชื่อที่ช่วงแรกจ่ายแต่ดอกเบี้ยแล้วค่อยจ่ายก้อนใหญ่ตอนท้ายได้ไหม
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ผู้ให้บริการต้องหลีกเลี่ยงการออกแบบผลิตภัณฑ์สินเชื่อในลักษณะที่จ่ายชำระช่วงแรกเฉพาะ}
+    key_facts: [["หลีกเลี่ยง", "ไม่ควร", "ไม่ได้"], ["balloon", "เงินก้อน"]]
+
+  - id: x-bot-13
+    category: regulation
+    user: nida
+    question: ต้องมีนโยบายปรับโครงสร้างหนี้เป็นลายลักษณ์อักษรไหม
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ผู้ให้บริการจะต้องกำหนดนโยบายและแนวทางการปรับปรุงโครงสร้างหนี้}
+    key_facts: [["ลายลักษณ์อักษร"]]
+
+  - id: x-bot-14
+    category: regulation
+    user: somchai
+    question: พนักงานขายพยายามให้ลูกค้ากู้เพิ่มทั้งที่ลูกค้าไม่ได้อยากได้ ทำได้ไหม
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: ผู้ให้บริการต้องเสนอขายโดยไม่กระตุ้นให้ลูกค้าก่อหนี้เกินควร}
+    key_facts: [["ไม่ได้", "ห้าม", "ต้องไม่", "ไม่ควร"]]
+
+  - id: x-bot-15
+    category: regulation
+    user: somchai
+    question: สินเชื่อหมุนเวียนที่จ่ายขั้นต่ำได้ ควรแจ้งลูกค้าเรื่องอะไรเป็นพิเศษ
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: หากจ่ายชำระหนี้คืนขั้นต่ำอย่างต่อเนื่อง จะส่งผลให้ต้องชำระดอกเบี้ยรวมทั้งสัญญาสูง}
+    key_facts: [["ดอกเบี้ย"], ["ขั้นต่ำ"]]
+
+  - id: x-bot-16
+    category: regulation
+    user: somchai
+    question: ลูกค้าอยากปิดสินเชื่อก่อนกำหนด ต้องแจ้งเขาเรื่องอะไรไว้ตั้งแต่ตอนขาย
+    expect: answer
+    evidence:
+      - {doc: bot-responsible-lending-2566, text: แจ้งวิธีการชำระหนี้ก่อนกำหนดทั้งจำนวนหรือบางส่วน}
+    key_facts: [["ก่อนกำหนด"], ["วิธีการ", "ตัดชำระ"]]

@@ -1,0 +1,117 @@
+{
+ "created_at": "2026-11-01T16:22:59+00:00",
+ "eval_set": "extended",
+ "reviewed_only": false,
+ "review": {
+  "total": 146,
+  "reviewed": 0,
+  "draft": 146,
+  "stale": 0,
+  "needs_fix": 0,
+  "rejected": 0,
+  "reviewed_share": 0.0
+ },
+ "n_questions": 146,
+ "settings": {
+  "embedding_model": "BAAI/bge-m3",
+  "reranker_model": "BAAI/bge-reranker-v2-m3",
+  "dense_top_k": 40,
+  "lexical_top_k": 40,
+  "rerank_candidates": 24,
+  "context_top_n": 6,
+  "abstain_threshold": 0.02,
+  "chunk_max_chars": 1400,
+  "gemini_model": "gemini-3.5-flash",
+  "gemini_batch_model": "gemini-3.1-flash-lite"
+ },
+ "gold_problems": [],
+ "retrieval_ablation": [
+  {
+   "config": "A. Fixed-size chunks + vector only (baseline)",
+   "hit@1": 0.336,
+   "hit@3": 0.445,
+   "hit@6": 0.516,
+   "recall@1": 0.324,
+   "recall@3": 0.438,
+   "recall@6": 0.512,
+   "mrr": 0.401,
+   "leakage": 0,
+   "latency_ms": 318
+  },
+  {
+   "config": "B. Structure-aware chunks + vector only",
+   "hit@1": 0.695,
+   "hit@3": 0.812,
+   "hit@6": 0.859,
+   "recall@1": 0.68,
+   "recall@3": 0.809,
+   "recall@6": 0.855,
+   "mrr": 0.759,
+   "leakage": 0,
+   "latency_ms": 73
+  },
+  {
+   "config": "C. Structure-aware chunks + BM25 only",
+   "hit@1": 0.477,
+   "hit@3": 0.688,
+   "hit@6": 0.758,
+   "recall@1": 0.461,
+   "recall@3": 0.676,
+   "recall@6": 0.754,
+   "mrr": 0.584,
+   "leakage": 0,
+   "latency_ms": 30
+  },
+  {
+   "config": "D. Hybrid (vector + BM25 + references, RRF)",
+   "hit@1": 0.633,
+   "hit@3": 0.812,
+   "hit@6": 0.852,
+   "recall@1": 0.621,
+   "recall@3": 0.809,
+   "recall@6": 0.852,
+   "mrr": 0.722,
+   "leakage": 0,
+   "latency_ms": 106
+  },
+  {
+   "config": "E. Hybrid + cross-encoder rerank",
+   "hit@1": 0.742,
+   "hit@3": 0.898,
+   "hit@6": 0.938,
+   "recall@1": 0.727,
+   "recall@3": 0.895,
+   "recall@6": 0.938,
+   "mrr": 0.829,
+   "leakage": 0,
+   "latency_ms": 564
+  },
+  {
+   "config": "F. E + glossary expansion + comparison lookup (production)",
+   "hit@1": 0.719,
+   "hit@3": 0.891,
+   "hit@6": 0.922,
+   "recall@1": 0.703,
+   "recall@3": 0.887,
+   "recall@6": 0.922,
+   "mrr": 0.81,
+   "leakage": 0,
+   "latency_ms": 605
+  }
+ ],
+ "threshold_calibration": {
+  "current": 0.02,
+  "current_accuracy": 0.949,
+  "best": 0.01,
+  "best_accuracy": 0.971,
+  "min_answerable_score": 0.0029,
+  "max_out_of_corpus_score": 0.3227,
+  "answerable_below_current": [
+   "x-pdpa-02",
+   "x-pdpa-07",
+   "x-pdpa-12",
+   "x-pii-01",
+   "x-pol-07"
+  ]
+ }
+}

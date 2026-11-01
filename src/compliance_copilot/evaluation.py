@@ -24,7 +24,7 @@ from typing import Any
 import yaml
 from sqlalchemy import select, text
 
-from . import llm
+from . import llm, review
 from .config import ROOT, get_settings
 from .db import User, engine, session
 from .generation.citations import _norm
@@ -33,7 +33,8 @@ from .security import to_context
 
 GOLD = ROOT / "eval" / "golden_set.yaml"
 RESULTS = ROOT / "eval" / "results"
-EVAL_SETS = {"main": "golden_set.yaml", "holdout": "holdout_set.yaml"}
+EVAL_SETS = {"main": "golden_set.yaml", "holdout": "holdout_set.yaml", "extended": "extended"}  # "extended" = eval/extended/*.yaml
+_ONLY_REVIEWED = False  # restrict to questions an expert has confirmed (see review.py)
 
 
 def use_set(name: str) -> str:
@@ -57,12 +58,20 @@ ABLATIONS: list[tuple[str, dict[str, Any]]] = [
 ABSTAIN_CATEGORIES = {"out_of_scope", "unanswerable"}
 
 
-def load_gold() -> list[dict[str, Any]]:
-    items = yaml.safe_load(GOLD.read_text(encoding="utf-8"))["items"]
+def raw_gold() -> list[dict[str, Any]]:
+    """Every question of the selected set, whatever its review status."""
+    files = sorted(GOLD.glob("*.yaml")) if GOLD.is_dir() else [GOLD]
+    items = [it for f in files for it in yaml.safe_load(f.read_text(encoding="utf-8"))["items"]]
     for it in items:
         if it.get("as_of") and not isinstance(it["as_of"], date):
             it["as_of"] = date.fromisoformat(str(it["as_of"]))
     return items
+
+
+def load_gold() -> list[dict[str, Any]]:
+    """The questions that count: rejected ones never do, and with ``reviewed_only`` only
+    expert-confirmed ones."""
+    return review.apply(raw_gold(), _ONLY_REVIEWED)
 
 
 def _users() -> dict[str, UserContext]:
@@ -108,14 +117,16 @@ def _rank_metrics(cands: list[Candidate], evidence: list[dict], k_values=(1, 3, 
     return out
 
 
-def eval_retrieval(log=print) -> dict[str, Any]:
+def eval_retrieval(log=print, production_only: bool = False) -> dict[str, Any]:
+    """Retrieval metrics per configuration. ``production_only`` skips the ablation (a CI gate on
+    slow CPU runners only needs the configuration that ships)."""
     items = load_gold()
     users = _users()
     s = get_settings()
     answerable = [it for it in items if it["expect"] == "answer" and it.get("evidence")]
     table = []
     production_scores: dict[str, float] = {}
-    for name, cfg in ABLATIONS:
+    for name, cfg in (ABLATIONS[-1:] if production_only else ABLATIONS):
         agg: dict[str, list[float]] = defaultdict(list)
         leaks = 0
         t0 = time.perf_counter()
@@ -210,7 +221,7 @@ def eval_end_to_end(limit: int | None = None, log=print, skip: set[str] | None =
             "pii_masked": bool(r.pii_masked), "pii_expected": bool(it.get("pii_expected")),
             "latency_ms": r.trace.get("latency_ms"),
             "tokens": (r.trace.get("llm") or {}).get("input_tokens", 0) + (r.trace.get("llm") or {}).get("output_tokens", 0),
-            "answer": r.answer[:600],
+            "answer": r.answer[:4000],  # kept whole enough to re-score key facts later
         }
         rows.append(row)
         log(f"{it['id']:8s} {expect:7s} -> {r.status:22s} ok={ok_behaviour} facts={facts_ok} leak={leak}")
@@ -272,14 +283,19 @@ def merge_e2e(prev: dict[str, Any] | None, new: dict[str, Any]) -> dict[str, Any
 
 
 def run(retrieval: bool = True, end_to_end: bool = True, limit: int | None = None, log=print,
-        resume: bool = True, eval_set: str = "main") -> dict:
+        resume: bool = True, eval_set: str = "main", reviewed_only: bool = False,
+        production_only: bool = False) -> dict:
+    global _ONLY_REVIEWED
     suffix = use_set(eval_set)
+    _ONLY_REVIEWED = reviewed_only
     RESULTS.mkdir(parents=True, exist_ok=True)
     latest = RESULTS / f"latest{suffix}.json"
     prev = json.loads(latest.read_text(encoding="utf-8")) if latest.exists() else {}
     out: dict[str, Any] = {
         "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "eval_set": eval_set,
+        "reviewed_only": reviewed_only,
+        "review": review.summary(raw_gold()),
         "n_questions": len(load_gold()),
         "settings": {k: v for k, v in get_settings().model_dump().items()
                      if k in ("embedding_model", "reranker_model", "dense_top_k", "lexical_top_k",
@@ -291,7 +307,7 @@ def run(retrieval: bool = True, end_to_end: bool = True, limit: int | None = Non
     for p in problems:
         log(f"GOLD PROBLEM: {p}")
     if retrieval:
-        r = eval_retrieval(log)
+        r = eval_retrieval(log, production_only)
         out["retrieval_ablation"], out["threshold_calibration"] = r["ablation"], r["threshold"]
     elif prev.get("retrieval_ablation"):
         out["retrieval_ablation"] = prev["retrieval_ablation"]
@@ -312,9 +328,15 @@ def run(retrieval: bool = True, end_to_end: bool = True, limit: int | None = Non
 
 
 def render_markdown(ev: dict[str, Any]) -> str:
-    title = "Evaluation report" + (" (held-out set)" if ev.get("eval_set") == "holdout" else "")
-    lines = [f"# {title}", "", f"Generated {ev['created_at']} · golden set: {ev['n_questions']} questions "
-             "(`eval/golden_set.yaml`)", ""]
+    names = {"holdout": " (held-out set)", "extended": " (extended set)"}
+    title = "Evaluation report" + names.get(ev.get("eval_set"), "")
+    lines = [f"# {title}", "", f"Generated {ev['created_at']} · {ev['n_questions']} questions"
+             + (" (expert-reviewed only)" if ev.get("reviewed_only") else ""), ""]
+    if rv := ev.get("review"):
+        lines += [f"Expert review: {rv['reviewed']} of {rv['total']} questions confirmed by a compliance expert "
+                  f"({rv['reviewed_share']:.0%}); {rv['draft']} still draft, {rv['stale']} edited since review, "
+                  f"{rv['needs_fix']} need a fix, {rv['rejected']} rejected. Unreviewed questions were written by "
+                  "engineers from the source text and have not been checked by the compliance team.", ""]
     if ev.get("retrieval_ablation"):
         cols = ["config", "hit@1", "hit@3", "hit@6", "recall@6", "mrr", "leakage", "latency_ms"]
         lines += ["## Retrieval ablation (top-6 context, answerable questions)", "",

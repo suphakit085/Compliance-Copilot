@@ -69,8 +69,10 @@ jobs:
         run: pytest -q -rs
       - name: Retrieval quality gate (main and held-out sets)
         run: |
-          copilot eval --no-e2e --min-hit6 0.95
-          copilot eval --no-e2e --set holdout --min-hit6 0.90
+          # production configuration only: the full ablation takes over an hour on a CPU runner
+          copilot eval --no-e2e --production-only --min-hit6 0.95
+          copilot eval --no-e2e --production-only --set holdout --min-hit6 0.90
+          copilot eval --no-e2e --production-only --set extended --min-hit6 0.90
       - name: Keep the evaluation report
         if: always()
         uses: actions/upload-artifact@v4
