@@ -18,7 +18,7 @@ from sqlalchemy import func, select, text
 
 from .. import __version__, audit, history, llm
 from ..config import ROOT, get_settings
-from ..db import AuditLog, Chunk, Document, Feedback, engine, init_db, session
+from ..db import AuditLog, Chunk, Document, Feedback, as_reader, engine, init_db, session
 from ..features import gap_analysis
 from ..generation.answerer import ChatResponse, answer_question
 from ..guardrails.pii import mask_pii
@@ -208,6 +208,7 @@ def _visible(user: UserContext):
 @app.get("/documents", tags=["documents"])
 def documents(user: Annotated[UserContext, Depends(current_user)]) -> list[dict[str, Any]]:
     with session() as db:
+        as_reader(db.connection(), user)
         rows = db.execute(
             select(Document, func.count(Chunk.id))
             .join(Chunk, (Chunk.document_id == Document.id) & (Chunk.strategy == "structured"), isouter=True)
@@ -235,6 +236,7 @@ def documents(user: Annotated[UserContext, Depends(current_user)]) -> list[dict[
 @app.get("/documents/{doc_id}/sections", tags=["documents"])
 def sections(doc_id: str, user: Annotated[UserContext, Depends(current_user)]) -> list[dict[str, Any]]:
     with session() as db:
+        as_reader(db.connection(), user)
         doc = db.execute(select(Document).where(Document.id == doc_id, _visible(user))).scalar_one_or_none()
         if not doc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found")

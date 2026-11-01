@@ -30,6 +30,28 @@ def test_confidential_document_never_reaches_unauthorised_users(corpus):
     assert "proc-str-001" in _docs(retrieve(STR_Q, COMPLIANCE))
 
 
+def test_row_level_security_holds_even_if_the_acl_filter_is_dropped(corpus, monkeypatch):
+    from compliance_copilot.retrieval import retriever
+
+    # simulate a developer bug: the permission lines removed from the retrieval SQL
+    no_acl = "\n".join(
+        line for line in retriever._ACL_AND_TIME.splitlines()
+        if "classification_level" not in line and "departments" not in line
+    )
+    monkeypatch.setattr(retriever, "_ACL_AND_TIME", no_acl)
+    assert "proc-str-001" not in _docs(retrieve(STR_Q, EMPLOYEE))
+    assert "proc-str-001" not in _docs(retrieve(STR_Q, AUDITOR))
+    assert "proc-str-001" in _docs(retrieve(STR_Q, COMPLIANCE))
+
+
+def test_reader_role_without_user_settings_sees_nothing(corpus):
+    from compliance_copilot.db import READER_ROLE
+
+    with engine().connect() as c:
+        c.execute(text(f"SET LOCAL ROLE {READER_ROLE}"))
+        assert c.execute(text("SELECT count(*) FROM chunks")).scalar_one() == 0
+
+
 def test_as_of_date_selects_the_version_in_force(corpus):
     q = "พนักงานรับของขวัญตามเทศกาลจากลูกค้าได้ไม่เกินกี่บาท"
     assert _docs(retrieve(q, EMPLOYEE)) & {"pol-gift-2568"}

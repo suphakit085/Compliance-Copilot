@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from .. import audit, llm
-from ..db import Chunk, Document, session
+from ..db import Chunk, Document, as_reader, session
 from ..generation.citations import verify_quote
 from ..generation.prompts import render_sources
 from ..retrieval.retriever import UserContext, retrieve
@@ -154,11 +154,16 @@ def analyze_policy(policy_id: str, user: UserContext, as_of: date | None = None,
     as_of = as_of or date.today()
     started = time.perf_counter()
     with session() as db:
-        doc = db.get(Document, policy_id)
-        if not doc or doc.source_kind != "internal":
+        exists = db.get(Document, policy_id)
+        if not exists or exists.source_kind != "internal":
             raise ValueError(f"{policy_id} is not an internal policy")
-        if doc.classification_level > user.clearance:
-            raise PermissionError("insufficient clearance for this policy")
+        # Read the policy as the user: row-level security hides it from users outside its
+        # clearance level or department scope.
+        db.expunge_all()
+        as_reader(db.connection(), user)
+        doc = db.get(Document, policy_id)
+        if doc is None:
+            raise PermissionError("insufficient access to this policy")
         clauses = list(db.execute(
             select(Chunk).where(Chunk.document_id == policy_id, Chunk.strategy == "structured")
             .order_by(Chunk.ordinal)

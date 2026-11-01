@@ -118,8 +118,10 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(30))  # employee | compliance_officer | auditor | admin
     department: Mapped[str] = mapped_column(String(40))
     clearance: Mapped[int] = mapped_column(Integer)
-    password_hash: Mapped[str] = mapped_column(Text)
+    password_hash: Mapped[str] = mapped_column(Text)  # "!" for SSO-only accounts
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # "<issuer>|<sub>" for users provisioned from the identity provider
+    external_id: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
 
 
 class AuditLog(Base):
@@ -214,14 +216,57 @@ def session() -> Iterator[Session]:
         s.close()
 
 
+READER_ROLE = "copilot_reader"
+
+# Second access-control layer, enforced by Postgres itself. Queries that read documents on
+# behalf of a user switch to READER_ROLE for the transaction (``as_reader``); for that role
+# only rows the user may see exist, so a query that forgets the ACL filter in its WHERE
+# clause still cannot return restricted text. Unset settings deny everything.
+# Ingestion, audit and admin tasks keep the owner role, which RLS does not apply to.
+_RLS = f"""
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{READER_ROLE}') THEN
+    CREATE ROLE {READER_ROLE} NOLOGIN;
+  END IF;
+END $$;
+GRANT {READER_ROLE} TO CURRENT_USER;
+GRANT USAGE ON SCHEMA public TO {READER_ROLE};
+GRANT SELECT ON documents, chunks TO {READER_ROLE};
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chunks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS document_visibility ON documents;
+CREATE POLICY document_visibility ON documents FOR SELECT TO {READER_ROLE} USING (
+  classification_level <= coalesce(nullif(current_setting('app.clearance', true), ''), '-1')::int
+  AND (jsonb_array_length(departments) = 0
+       OR departments ? coalesce(current_setting('app.department', true), ''))
+);
+DROP POLICY IF EXISTS chunk_visibility ON chunks;
+CREATE POLICY chunk_visibility ON chunks FOR SELECT TO {READER_ROLE} USING (
+  EXISTS (SELECT 1 FROM documents d WHERE d.id = chunks.document_id)
+);
+"""
+
+
+def as_reader(conn, user) -> None:
+    """Run the rest of the current transaction as ``user`` under row-level security."""
+    conn.execute(text(f"SET LOCAL ROLE {READER_ROLE}"))
+    conn.execute(
+        text("SELECT set_config('app.clearance', :c, true), set_config('app.department', :d, true)"),
+        {"c": str(user.clearance), "d": user.department},
+    )
+
+
 def init_db() -> None:
     with engine().begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(engine())
+    with engine().begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS external_id text UNIQUE"))
+        conn.execute(text(_RLS))
 
 
 __all__ = [
     "JSON", "CLEARANCE", "AuditLog", "Base", "Chunk", "Conversation", "ConversationMessage",
-    "Document", "EvalRun", "Feedback", "User",
-    "engine", "init_db", "session",
+    "Document", "EvalRun", "Feedback", "READER_ROLE", "User",
+    "as_reader", "engine", "init_db", "session",
 ]

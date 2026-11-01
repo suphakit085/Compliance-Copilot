@@ -24,7 +24,7 @@ from typing import Any
 from sqlalchemy import text
 
 from ..config import get_settings
-from ..db import engine
+from ..db import as_reader, engine
 from . import bm25, models
 from .text_index import expand_query, explicit_references, query_terms
 
@@ -172,6 +172,9 @@ def retrieve(
     terms = query_terms(search_query)
 
     with engine().connect() as conn:
+        # Defence in depth: the WHERE clause above filters by permission, and row-level
+        # security makes rows outside the user's clearance invisible to this transaction.
+        as_reader(conn, user)
         if use_dense:
             t0 = time.perf_counter()
             qvec = models.embed_query(search_query)
@@ -199,7 +202,8 @@ def retrieve(
                      + " AND c.lexical @@ to_tsquery('simple', :tsq)"),
                 {**params, "tsq": _tsquery(terms)},
             ).fetchall()
-            stats = bm25.corpus_stats(conn, strategy)
+            with engine().connect() as owner:  # corpus-wide IDF, independent of the viewer
+                stats = bm25.corpus_stats(owner, strategy)
             scored = sorted(
                 ((bm25.score(terms, r.tokens_text.split(), stats), r) for r in rows),
                 key=lambda x: x[0], reverse=True,
