@@ -203,7 +203,7 @@ flowchart LR
 | API | FastAPI, JWT, role-based endpoints | Authorisation lives server-side; the UI is untrusted |
 | Web | Next.js 16 + shadcn/ui, BFF proxy with httpOnly cookie | Session token is never readable by browser JavaScript |
 
-Details and design decisions: [`docs/architecture.md`](docs/architecture.md). Containers, CI, monitoring, backups and measured capacity: [`docs/deployment.md`](docs/deployment.md). Rolling it out: [`docs/user-guide.md`](docs/user-guide.md) (Thai: guide, training, pilot), [`docs/incident-process.md`](docs/incident-process.md) (Thai), [`docs/model-risk.md`](docs/model-risk.md) (Thai: risk register, validation, approval checklist) with the generated [`docs/evidence/model-card.md`](docs/evidence/model-card.md). Roles, intake rules and decisions the organisation must make: [`docs/governance.md`](docs/governance.md) (Thai).
+Details and design decisions: [`docs/architecture.md`](docs/architecture.md). Containers, CI, monitoring, backups and measured capacity: [`docs/deployment.md`](docs/deployment.md). Rolling it out: [`docs/user-guide.md`](docs/user-guide.md) (Thai: guide, training, pilot), [`docs/incident-process.md`](docs/incident-process.md) (Thai), [`docs/readiness-checklist.md`](docs/readiness-checklist.md) (Thai: what is done vs. what the bank must do), [`docs/model-risk.md`](docs/model-risk.md) (Thai: risk register, validation, approval checklist) with the generated [`docs/evidence/model-card.md`](docs/evidence/model-card.md). Roles, intake rules and decisions the organisation must make: [`docs/governance.md`](docs/governance.md) (Thai).
 
 ## Thai document processing — the unglamorous part that matters
 
