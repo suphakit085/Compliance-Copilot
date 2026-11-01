@@ -49,12 +49,12 @@ jobs:
           uv pip install --no-deps -e .
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: Cache retrieval models
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .hf
           key: hf-bge-m3-reranker-v2-m3-v1
       - name: Cache regulation PDFs
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: data/raw/*.pdf
           key: corpus-${{ hashFiles('data/sources.yaml', 'data/raw/manifest.lock.json') }}
