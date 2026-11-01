@@ -70,7 +70,8 @@ def _breadcrumb(spec: SourceSpec, path: list[str], label: str, title: str | None
 
 
 def structured_chunks(spec: SourceSpec, doc: LoadedDocument, max_chars: int) -> list[ChunkData]:
-    mode = spec.get("structure")
+    # internal policies use our own "ข้อ N" format, even when short (auto-detection needs >= 4 clauses)
+    mode = spec.get("structure") or ("clause" if spec.source_kind == "internal" else None)
     sections: list[Section] = parse_structure(doc.lines, mode)
     chunks: list[ChunkData] = []
     seen: dict[str, int] = {}

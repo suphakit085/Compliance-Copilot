@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, FileScan, FlaskConical, Lock, Search, StickyNote, TriangleAlert } from "lucide-react";
+import { ClipboardCheck, ExternalLink, FileScan, FlaskConical, Lock, Search, StickyNote, TriangleAlert } from "lucide-react";
 import { api, type DocumentInfo, type Section } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/app-shell";
@@ -95,6 +95,29 @@ export default function DocumentsPage() {
                     </div>
                   ))}
                 </div>
+                {doc.source_kind === "internal" && doc.governance?.owner && (
+                  <div className="panel flex flex-wrap items-center gap-x-5 gap-y-1.5 px-3.5 py-2.5 text-sm">
+                    <ClipboardCheck className="size-4 text-muted-foreground" />
+                    <span><span className="text-muted-foreground">เจ้าของ </span>{doc.governance.owner}</span>
+                    <span><span className="text-muted-foreground">อนุมัติโดย </span>{doc.governance.approved_by} · {doc.governance.approved_on}</span>
+                    <span
+                      className={cn(
+                        doc.governance.review_state === "overdue" && "font-medium text-red-600 dark:text-red-400",
+                        doc.governance.review_state === "due_soon" && "font-medium text-amber-600 dark:text-amber-400",
+                      )}
+                    >
+                      <span className="font-normal text-muted-foreground">ทบทวนภายใน </span>
+                      {doc.governance.review_due}
+                      {doc.governance.review_state === "overdue" && " · เกินกำหนดทบทวน"}
+                      {doc.governance.review_state === "due_soon" && ` · อีก ${doc.governance.review_days_left} วัน`}
+                    </span>
+                  </div>
+                )}
+                {doc.source_kind === "regulation" && doc.source_checked_at && (
+                  <p className="text-xs text-muted-foreground">
+                    ตรวจสอบกับต้นฉบับล่าสุด {new Date(doc.source_checked_at).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                )}
                 {doc.amended_by?.map((a) => (
                   <div key={a.ref} className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />

@@ -74,6 +74,8 @@ class Document(Base):
     synthetic: Mapped[bool] = mapped_column(Boolean, default=False)
     page_count: Mapped[int | None] = mapped_column(Integer)
     quality: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # internal documents: owner, approver, approval date, review due date, status
+    governance: Mapped[dict] = mapped_column(JSONB, default=dict)
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -262,6 +264,7 @@ def init_db() -> None:
     Base.metadata.create_all(engine())
     with engine().begin() as conn:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS external_id text UNIQUE"))
+        conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS governance jsonb NOT NULL DEFAULT '{}'"))
         conn.execute(text(_RLS))
 
 

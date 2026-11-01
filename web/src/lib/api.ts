@@ -93,6 +93,16 @@ export interface DocumentInfo {
   pages: number | null;
   chunks: number;
   quality: { dictionary_coverage?: number; ocr_pages?: number[]; footnotes?: number };
+  governance: {
+    owner?: string;
+    approved_by?: string;
+    approved_on?: string;
+    review_due?: string;
+    status?: string;
+    review_state?: "ok" | "due_soon" | "overdue";
+    review_days_left?: number;
+  };
+  source_checked_at: string | null;
 }
 
 export interface Section {

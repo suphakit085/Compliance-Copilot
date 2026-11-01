@@ -83,6 +83,7 @@ def markdown_lines(path: Path) -> list[Line]:
     indented line, which is how the parser recognises paragraph boundaries in PDFs.
     """
     _, body = _split_front_matter(path.read_text(encoding="utf-8"))
+    body = re.sub(r"<!--.*?-->", "", body, flags=re.S)  # authoring notes are not policy text
     lines: list[Line] = []
     for raw in body.splitlines():
         t = raw.strip()
