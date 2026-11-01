@@ -40,7 +40,8 @@ type Live = { stage: ChatStage; sources: ChatResponse["sources"]; draft: string 
  *  text is a draft - citations are only checked against the originals at the end. */
 function LiveAnswer({ live }: { live: Live }) {
   const i = STAGE_STEP[live.stage];
-  const md = live.draft.replace(/\[S(\d+)\]/g, "`[S$1]`");
+  // adjacent chips ("[S1][S2]") must not become one malformed code span
+  const md = live.draft.replace(/\[S(\d+)\]/g,"`[S$1]`").replace(/``/g, "` `");
   return (
     <div className="space-y-3">
       {live.draft ? (
