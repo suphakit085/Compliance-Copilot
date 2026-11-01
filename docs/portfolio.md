@@ -1,6 +1,6 @@
 # Compliance Copilot — portfolio write-up
 
-ไฟล์นี้เตรียมไว้ให้คัดลอกไปทำ portfolio / LinkedIn / เรซูเม่ มีสองภาษา: ภาษาอังกฤษ (ส่วนที่ 1–7) และภาษาไทย (ส่วนที่ 8)
+ไฟล์นี้เตรียมไว้ให้คัดลอกไปทำ portfolio / LinkedIn / เรซูเม่ มีสองภาษา: ภาษาอังกฤษ (ส่วนที่ 1–8) และภาษาไทย (ส่วนที่ 9)
 ตัวเลขทุกตัวมาจากผลทดสอบจริงใน repo (`docs/evaluation.md`, `docs/deployment.md`) ถ้าจะแก้ตัวเลข ให้ตรวจกับไฟล์เหล่านั้นก่อน
 
 ---
@@ -11,7 +11,7 @@
 
 Stack: Python · FastAPI · PostgreSQL + pgvector · BGE-M3 + cross-encoder reranker · Gemini · Next.js 16 + shadcn/ui · Docker · GitHub Actions · Prometheus
 
-![Grounded answer with verified, highlighted citations](images/chat-answer.png)
+![Grounded answer with verified, highlighted citations](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/chat-answer.png)
 
 ## 2. The problem
 
@@ -36,6 +36,10 @@ Compliance teams answer legal questions every day, and "probably right" is not g
 
 ## 4. Architecture
 
+![Architecture: how an answer is made](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/architecture.png)
+
+<details><summary>Same flow as a Mermaid diagram (renders on GitHub only)</summary>
+
 ```mermaid
 flowchart LR
   U[User] --> W[Next.js BFF<br/>httpOnly session]
@@ -50,7 +54,25 @@ flowchart LR
   R <--> DB[(PostgreSQL + pgvector)]
 ```
 
-## 5. Results (honest version)
+</details>
+
+## 5. Screenshots
+
+Every image is an absolute URL, so this file can be copied into another site and the pictures still load.
+Captions are written to be reused. All screens use synthetic internal policies and demo accounts.
+
+| | |
+|---|---|
+| ![Login](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/login.png) **Sign-in.** Local accounts or OIDC SSO; five failed attempts lock the account. | ![Terms](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/terms.png) **Acceptable-use terms.** Versioned; the server refuses questions until the current version is accepted, and acceptance is audited. |
+| ![Empty chat](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/chat-empty.png) **Ask.** Choose the "as of" date; answers follow the version of the law in force then. | ![Streaming draft](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/streaming-draft.png) **Streaming.** Real pipeline progress, sources first, then text labelled as an unverified draft. |
+| ![Verified answer](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/chat-answer.png) **Verified answer.** Each citation was checked against the source in code; the quote is highlighted in the original. A synthetic-document warning is shown. | ![Report dialog](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/report-dialog.png) **Report a problem.** Categorised; "saw something I shouldn't" is raised as a security incident immediately. |
+| ![Triage](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/reports-triage.png) **Triage.** Compliance officers resolve or dismiss a report; the reporter sees the note. | ![Documents](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/documents.png) **Document library.** Legal-unit chunks, effective dates, owner / approver / review-due governance panel (here: review overdue). |
+| ![Gap analysis](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/gap-analysis.png) **Policy gap analysis.** Each internal clause checked against the law, with verified quotes. | ![Audit](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/audit.png) **Audit trail.** Hash-chained; one click re-verifies the whole chain. |
+| ![Evaluation](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/evaluation.png) **Evaluation dashboard.** Blind vs after-fix results, per category. | ![Mobile](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/mobile-chat.png) **Mobile.** Same app on a phone viewport. |
+
+![User guide page](https://raw.githubusercontent.com/suphakit085/Compliance-Copilot/main/docs/images/help.png)
+
+## 6. Results (honest version)
 
 218 evaluation questions in three sets, scored with deterministic checks (evidence strings, required facts, quote verification), not an LLM judge.
 
@@ -68,7 +90,7 @@ flowchart LR
 
 **What these numbers do not prove:** all questions were written by engineers and none is confirmed by a compliance expert yet; the internal policies are synthetic samples; it has not been used by real users or penetration-tested. The repository says so, and ships the tooling (Excel export/import with stale-review detection) to close that gap.
 
-## 6. Engineering stories worth telling
+## 7. Engineering stories worth telling
 
 1. **A held-out set found what the tuned set hid.** After reaching 100% on my 51 questions I wrote 21 new ones in the way staff actually ask and ran them once, blind: 85.7% behaviour. Three real bugs: the system repeated an internal policy's wrong 45-day deadline instead of the law's 30 days; a too-high abstain threshold refused answerable colloquial questions; a name after "คุณ" wasn't masked. I fixed them, kept the blind numbers in the repo, and labelled the post-fix numbers as no longer blind.
 2. **My own gold answers were wrong.** A validator that checks every expected quote against the corpus caught quotes broken by PDF line breaks; reading failed answers showed three expected wordings were too strict. I corrected only what could be verified (stored answers were truncated at 600 characters, so facts could only be credited, never withdrawn) and kept the as-run results.
@@ -77,7 +99,7 @@ flowchart LR
 5. **The first CI run found two bugs my machine hid:** route types missing in a clean checkout, and a government server that omits its intermediate TLS certificate (Windows fetches it silently, Linux doesn't). Fixed by shipping the verified intermediate certificate rather than turning TLS verification off.
 6. **Security checks that fail loudly.** In production mode the API refuses to start if demo accounts still have their published passwords — I watched it do exactly that when I restored development data into the production stack.
 
-## 7. Ready-to-paste résumé bullets
+## 8. Ready-to-paste résumé bullets
 
 - Built an end-to-end RAG assistant for Thai banking/securities compliance (FastAPI, PostgreSQL/pgvector, BGE-M3 + reranker, Gemini, Next.js) with code-verified citations to the exact section of the law and calibrated abstention; 0 confidential-document leakage across 218 evaluation questions.
 - Designed a deterministic evaluation harness (218 questions, ablation, threshold calibration, blind held-out sets); showed structure-aware chunking and hybrid retrieval + reranking raised Hit@6 from ~52–57% to 92–100%, and reported blind vs. tuned results separately.
@@ -86,7 +108,7 @@ flowchart LR
 - Shipped streaming answers with a verified-citation guarantee, containerised the stack (Docker, production compose), added CI/CD, Prometheus alerting on answer-trustworthiness metrics, and a tested backup/restore.
 - Wrote the governance material for rollout: model-risk dossier with an auto-generated evidence pack, user training plan, incident process.
 
-## 8. สรุปภาษาไทย
+## 9. สรุปภาษาไทย
 
 **Compliance Copilot** — ผู้ช่วย AI สำหรับทีม Compliance ธนาคารและธุรกิจหลักทรัพย์ ตอบคำถามเรื่อง PDPA, พ.ร.บ.ฟอกเงิน, กฎกระทรวง CDD, ประกาศ ธปท. และ ก.ล.ต. พร้อมนโยบายภายใน
 โดยยึดหลัก **ไม่มีหลักฐานที่ตรวจสอบได้ = ไม่ตอบ**
@@ -117,7 +139,7 @@ CI รอบแรกเจอ 2 ปัญหาที่เครื่อง�
 
 **ต่อยอด** — ให้ทีม compliance ยืนยันเฉลย (มีเครื่องมือ Excel/ledger พร้อม), เชื่อม SSO กับระบบจริง, ขยายคลังกฎหมาย, นำร่องกับผู้ใช้ 5–10 คน ดู `docs/readiness-checklist.md`
 
-## 9. Links inside the repo
+## 10. Links inside the repo
 
 | ต้องการ | ไฟล์ |
 |---|---|
@@ -128,4 +150,4 @@ CI รอบแรกเจอ 2 ปัญหาที่เครื่อง�
 | คู่มือเตรียมสัมภาษณ์ (ไทย) | [interview-guide.md](interview-guide.md) |
 | บทเดโม 4 นาที | [demo-script.md](demo-script.md) |
 | สถานะความพร้อมและสิ่งที่ยังต้องทำ | [readiness-checklist.md](readiness-checklist.md) |
-| ภาพหน้าจอ | [images/](images/) |
+| ภาพหน้าจอและแผนภาพ (14 ไฟล์ PNG) | [images/](images/) |
