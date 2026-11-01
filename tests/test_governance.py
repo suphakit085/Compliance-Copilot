@@ -75,6 +75,7 @@ def test_glossary_terms_point_at_real_documents():
     data = get_settings().data_dir
     g = yaml.safe_load((data / "glossary.yaml").read_text(encoding="utf-8"))
     ids = {d["id"] for d in yaml.safe_load((data / "sources.yaml").read_text(encoding="utf-8"))["documents"]}
+    ids |= {p.stem for p in (data / "internal").glob("*.md")}  # a term may point at an internal policy
     assert g["terms"] and all(t["source"] in ids for t in g["terms"])
 
 

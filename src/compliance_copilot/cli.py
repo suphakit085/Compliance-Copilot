@@ -192,7 +192,9 @@ def evaluate(
     e2e: Annotated[bool, typer.Option("--e2e/--no-e2e", help="End-to-end eval (uses the LLM)")] = True,
     limit: int | None = None,
     fresh: Annotated[bool, typer.Option("--fresh", help="Re-evaluate questions already done")] = False,
-    eval_set: Annotated[str, typer.Option("--set", help="main | holdout")] = "main",
+    eval_set: Annotated[str, typer.Option("--set", help="main | holdout | extended")] = "main",
+    reviewed_only: Annotated[bool, typer.Option("--reviewed-only", help="Only expert-confirmed questions")] = False,
+    production_only: Annotated[bool, typer.Option("--production-only", help="Skip the ablation (fast CI gate)")] = False,
     min_hit6: Annotated[float | None, typer.Option(help="Exit 1 if production Hit@6 is below this (CI gate)")] = None,
 ) -> None:
     """Run the golden-set evaluation and write eval/results + docs/eval-report.md.
@@ -201,7 +203,8 @@ def evaluate(
     questions not evaluated yet."""
     from .evaluation import run
 
-    out = run(retrieval=retrieval, end_to_end=e2e, limit=limit, log=console.print, resume=not fresh, eval_set=eval_set)
+    out = run(retrieval=retrieval, end_to_end=e2e, limit=limit, log=console.print, resume=not fresh,
+              eval_set=eval_set, reviewed_only=reviewed_only, production_only=production_only)
     if out.get("end_to_end"):
         e = out["end_to_end"]
         console.print_json(json.dumps(e["summary"], ensure_ascii=False))
@@ -272,6 +275,91 @@ def bench(
     console.print(table)
     if torch is not None:
         console.print(f"peak GPU memory for the two models + inference: {torch.cuda.max_memory_allocated() / 2**30:.2f} GiB")
+
+
+review_app = typer.Typer(help="Send evaluation questions to compliance experts and record their verdicts")
+app.add_typer(review_app, name="eval-review")
+
+
+def _items(sets: str) -> list[dict]:
+    from . import evaluation
+
+    items: list[dict] = []
+    for name in sets.split(","):
+        evaluation.use_set(name.strip())
+        items += evaluation.raw_gold()
+    return items
+
+
+@review_app.command("export")
+def review_export(
+    out: Annotated[str, typer.Option(help="Excel file to write")] = "eval-review.xlsx",
+    sets: Annotated[str, typer.Option(help="Comma-separated: main,holdout,extended")] = "extended",
+    pending: Annotated[bool, typer.Option(help="Only questions not yet confirmed")] = True,
+) -> None:
+    """Write a workbook of questions for an expert to confirm (ok / fix / reject)."""
+    from pathlib import Path
+
+    from .review import export_xlsx
+
+    n = export_xlsx(_items(sets), Path(out), only_pending=pending)
+    console.print(f"wrote {n} questions to {out}")
+
+
+@review_app.command("import")
+def review_import(
+    file: str,
+    reviewer: Annotated[str, typer.Option(help="Name recorded with every verdict")],
+    sets: Annotated[str, typer.Option(help="Comma-separated: main,holdout,extended")] = "main,holdout,extended",
+) -> None:
+    """Record the verdicts from a returned workbook in eval/review/ledger.yaml."""
+    from pathlib import Path
+
+    from .review import import_xlsx
+
+    try:
+        counts = import_xlsx(Path(file), _items(sets), reviewer)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
+    console.print(f"recorded: {counts or 'nothing (no verdicts filled in)'}")
+
+
+@review_app.command("status")
+def review_status(sets: Annotated[str, typer.Option(help="Comma-separated sets")] = "main,holdout,extended") -> None:
+    """How much of each question set an expert has confirmed."""
+    from .review import summary
+
+    table = Table(title="Expert review coverage")
+    for c in ("set", "questions", "reviewed", "draft", "stale", "needs fix", "rejected"):
+        table.add_column(c, justify="right" if c != "set" else "left")
+    for name in sets.split(","):
+        s = summary(_items(name))
+        table.add_row(name, str(s["total"]), f"{s['reviewed']} ({s['reviewed_share']:.0%})", str(s["draft"]),
+                      str(s["stale"]), str(s["needs_fix"]), str(s["rejected"]))
+    console.print(table)
+
+
+@app.command("feedback-report")
+def feedback_report(
+    days: int = 30,
+    positive: Annotated[bool, typer.Option(help="Include 👍 as well")] = False,
+    draft: Annotated[int | None, typer.Option(help="Audit id to turn into a draft evaluation question")] = None,
+) -> None:
+    """Thumbs-down answers of the last N days, and (with --draft ID) a question skeleton for an expert."""
+    from . import feedback
+
+    if draft is not None:
+        console.print(f"draft written: {feedback.draft_question(draft)}")
+        return
+    rows = feedback.report(days, positive)
+    table = Table(title=f"{'Feedback' if positive else 'Thumbs-down answers'}, last {days} days")
+    for c in ("audit", "when", "status", "support", "question", "comment"):
+        table.add_column(c)
+    for r in rows:
+        table.add_row(str(r["audit_id"]), r["ts"][:16], str(r["status"]), str(r["support_rate"]),
+                      (r["question"] or "")[:60], (r["comment"] or "")[:40])
+    console.print(table if rows else "no feedback in this period")
 
 
 @app.command("purge-history")

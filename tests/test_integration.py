@@ -181,3 +181,24 @@ def test_policy_question_also_brings_the_governing_law(corpus):
     # internal policy's 45 days because PDPA s.30 (30 days) was not in the context
     r = retrieve("ลูกค้าโทรมาขอดูข้อมูลส่วนตัวทั้งหมดที่ธนาคารเก็บไว้ เราต้องส่งให้ภายในกี่วัน", EMPLOYEE)
     assert any(c.document_id == "pdpa-2562" and c.label.startswith("มาตรา 30") for c in r.candidates)
+
+
+def test_gap_analysis_reads_a_notification_together_with_the_act_it_is_issued_under(corpus):
+    from datetime import date as _date
+
+    from compliance_copilot.features import gap_analysis as ga
+
+    assert ga.parents()["pdpc-breach-2565"] == "pdpa-2562" and ga.parents()["cdd-2563"] == "amla-2542"
+    assert ga.level("act")[1] < ga.level("ministerial_regulation")[1] < ga.level("notification")[1] < ga.level("circular")[1]
+    # a clause about the form of a breach report matches the notification best; the Act must still be consulted
+    clause = "การแจ้งเหตุละเมิดข้อมูลส่วนบุคคลต่อสำนักงานต้องมีรายละเอียดผลกระทบและมาตรการที่ใช้แก้ไข"
+    only_child = retrieve(clause, COMPLIANCE, doc_ids=["pdpc-breach-2565"], compare=False, top_n=3)
+    assert _docs(only_child) == {"pdpc-breach-2565"}
+    merged = ga.with_parents(only_child.candidates, clause, COMPLIANCE, _date.today())
+    assert {"pdpc-breach-2565", "pdpa-2562"} <= {c.document_id for c in merged}
+    assert len(merged) <= ga.MAX_SOURCES
+    # no parent is added when the document has none, or when it is already present
+    again = ga.with_parents(merged, clause, COMPLIANCE, _date.today())
+    assert [c.chunk_id for c in again] == [c.chunk_id for c in merged]
+    solo = retrieve("การเสนอขายผลิตภัณฑ์ลงทุนต้องไม่เร่งรัดลูกค้า", COMPLIANCE, doc_ids=["pdpa-2562"], compare=False, top_n=2)
+    assert {c.document_id for c in ga.with_parents(solo.candidates, "x", COMPLIANCE, _date.today())} == {"pdpa-2562"}

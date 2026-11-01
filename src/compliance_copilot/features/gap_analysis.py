@@ -15,6 +15,7 @@ from __future__ import annotations
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from functools import lru_cache
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -24,10 +25,49 @@ from .. import audit, llm
 from ..db import Chunk, Document, as_reader, session
 from ..generation.citations import verify_quote
 from ..generation.prompts import render_sources
+from ..ingestion.loaders import load_manifest
 from ..retrieval.retriever import UserContext, retrieve
 
-GAP_PROMPT_VERSION = "gap-v2"
+GAP_PROMPT_VERSION = "gap-v3"
 RELEVANCE_FLOOR = 0.10
+MAX_SOURCES = 7
+
+# Thai law is layered: an Act, ministerial regulations under it, regulators' notifications under
+# those, then circulars and policy statements. A policy must satisfy every layer that applies.
+LEVELS = {
+    "act": ("พระราชบัญญัติ (ระดับ 1 สูงสุด)", 1),
+    "ministerial_regulation": ("กฎกระทรวง (ระดับ 2)", 2),
+    "notification": ("ประกาศหน่วยงานกำกับ (ระดับ 3)", 3),
+    "circular": ("หนังสือเวียน/นโยบาย/แนวปฏิบัติ (ระดับ 4)", 4),
+}
+
+
+@lru_cache
+def parents() -> dict[str, str]:
+    """document id -> id of the document it is issued under (only if that is in the corpus)."""
+    return {s.id: s.get("parent") for s in load_manifest() if s.get("parent")}
+
+
+def level(doc_type: str) -> tuple[str, int]:
+    return LEVELS.get(doc_type, ("เอกสารกำกับอื่น", 5))
+
+
+def with_parents(cands: list, text: str, user: UserContext, as_of: date) -> list:
+    """Add the governing parent document of every retrieved instrument that is missing from the
+    result - a notification is read together with its Act, a ministerial regulation with its Act -
+    so neither layer can be overlooked just because the other one ranked higher."""
+    have = {c.document_id for c in cands}
+    out = list(cands)
+    for child in {c.document_id for c in cands}:
+        parent = parents().get(child)
+        if not parent or parent in have:
+            continue
+        found = retrieve(text, user, as_of, doc_ids=[parent], top_n=2, compare=False)
+        extra = [c for c in found.candidates if (c.rerank_score or 0) >= RELEVANCE_FLOOR]
+        out += extra
+        if extra:
+            have.add(parent)
+    return out[:MAX_SOURCES]
 
 GAP_SYSTEM = """\
 You are a senior compliance analyst at a Thai bank. Compare ONE clause of an internal \
@@ -45,6 +85,12 @@ prohibited practice).
 Severity: "high" for conflicts that could cause a regulatory breach or penalty, "medium" \
 for material omissions, "low" for minor wording/clarity issues, "none" when compliant or \
 not applicable.
+
+Legal hierarchy: each source states its level (1 = Act, 2 = ministerial regulation, 3 = \
+regulator notification, 4 = circular/policy statement). The clause must satisfy EVERY level \
+that applies, so measure it against the strictest requirement among the sources and say which \
+source sets it. If two sources differ, the higher level prevails; mention the difference in \
+`finding`. A clause that meets a notification but not the Act it is issued under is a conflict.
 
 Rules: use only the SOURCES; quote them VERBATIM in `regulation_citations` (10-200 \
 characters, exact text - quotes are machine-checked); quote the policy clause verbatim in \
@@ -105,13 +151,14 @@ def _assess(clause: Chunk, user: UserContext, as_of: date) -> Finding:
         )
     sources = []
     by_id = {}
-    for i, c in enumerate(r.candidates, 1):
+    cands = with_parents(r.candidates, clause.text[:800], user, as_of)
+    for i, c in enumerate(cands, 1):
         sid = f"S{i}"
         by_id[sid] = c
         sources.append({
             "id": sid, "doc_title": c.doc["title"], "location": " > ".join([*c.path, c.label]),
             "version": c.doc.get("version"), "effective": c.doc.get("effective_from"),
-            "kind": "กฎหมาย/ประกาศของหน่วยงานกำกับ", "notes": c.notes, "text": c.text,
+            "kind": level(c.doc["doc_type"])[0], "notes": c.notes, "text": c.text,
         })
     prompt = (
         f"As-of date: {as_of.isoformat()}\n\nSOURCES:\n{render_sources(sources)}\n\n"
