@@ -1,17 +1,17 @@
 # Evaluation report
 
-Generated 2026-10-31T22:05:00+00:00 · golden set: 51 questions (`eval/golden_set.yaml`)
+Generated 2026-11-01T10:00:34+00:00 · golden set: 51 questions (`eval/golden_set.yaml`)
 
 ## Retrieval ablation (top-6 context, answerable questions)
 
 | config | hit@1 | hit@3 | hit@6 | recall@6 | mrr | leakage | latency_ms |
 |---|---|---|---|---|---|---|---|
-| A. Fixed-size chunks + vector only (baseline) | 0.35 | 0.5 | 0.575 | 0.537 | 0.434 | 0 | 535 |
-| B. Structure-aware chunks + vector only | 0.625 | 0.85 | 0.9 | 0.887 | 0.742 | 0 | 73 |
+| A. Fixed-size chunks + vector only (baseline) | 0.35 | 0.5 | 0.575 | 0.537 | 0.434 | 0 | 513 |
+| B. Structure-aware chunks + vector only | 0.625 | 0.85 | 0.9 | 0.887 | 0.742 | 0 | 75 |
 | C. Structure-aware chunks + BM25 only | 0.5 | 0.725 | 0.825 | 0.787 | 0.622 | 0 | 29 |
-| D. Hybrid (vector + BM25 + references, RRF) | 0.625 | 0.85 | 0.9 | 0.887 | 0.74 | 0 | 109 |
-| E. Hybrid + cross-encoder rerank | 0.85 | 0.9 | 0.975 | 0.963 | 0.891 | 0 | 680 |
-| F. E + domain glossary expansion (production) | 0.85 | 0.925 | 1.0 | 0.988 | 0.9 | 0 | 523 |
+| D. Hybrid (vector + BM25 + references, RRF) | 0.625 | 0.85 | 0.9 | 0.887 | 0.74 | 0 | 111 |
+| E. Hybrid + cross-encoder rerank | 0.85 | 0.9 | 0.975 | 0.963 | 0.891 | 0 | 697 |
+| F. E + glossary expansion + comparison lookup (production) | 0.85 | 0.925 | 1.0 | 1.0 | 0.9 | 0 | 572 |
 
 ### Abstention threshold calibration
 
@@ -19,28 +19,34 @@ Generated 2026-10-31T22:05:00+00:00 · golden set: 51 questions (`eval/golden_se
 - best on this set 0.15 → 1.0
 - lowest score of an answerable question: 0.2424; highest score of an out-of-corpus question: 0.0077
 
-## End-to-end (model: gemini-3.5-flash)
-
-> Last run stopped early: Gemini daily quota exhausted for gemini-3.5-flash: You exceeded your current quota, please check your plan and billing details. For more information on this err
-
-> Not yet evaluated (41): pdpa-03, cdd-02, cdd-03, cdd-04, bot-01, bot-02, bot-03, bot-04, bot-05, bot-06, ocr-01, sec-01, sec-02, sec-03, sec-04, sec-05, sec-06, pol-01, pol-02, pol-03, pol-04, pol-05, pol-06, conf-01, conf-02, conf-03, rbac-01, rbac-02, rbac-03, rbac-04, ref-01, ref-02, oos-01, oos-02, una-01, una-02, una-03, inj-01, inj-02, inj-03, pii-01
+## End-to-end (model: gemini-3.1-flash-lite)
 
 | metric | value |
 |---|---|
 | behaviour_accuracy | 1.0 |
 | key_fact_accuracy | 1.0 |
-| citation_precision | 0.715 |
-| citation_recall | 1.0 |
-| quote_verification_rate | 1.0 |
+| citation_precision | 0.631 |
+| citation_recall | 0.988 |
+| quote_verification_rate | 0.974 |
 | leakage_count | 0 |
-| pii_masking_recall | None |
-| latency_p50_ms | 8956 |
-| latency_p95_ms | 27420 |
-| n_evaluated | 10 |
+| pii_masking_recall | 1.0 |
+| latency_p50_ms | 3497 |
+| latency_p95_ms | 8765 |
+| n_evaluated | 51 |
 
 | category | n | behaviour | key facts | citation recall |
 |---|---|---|---|---|
-| regulation | 10 | 1.0 | 1.0 | 1.0 |
+| conflict | 3 | 1.0 | 1.0 | 0.833 |
+| explicit_ref | 3 | 1.0 | 1.0 | 1.0 |
+| injection | 3 | 1.0 | None | None |
+| ocr | 1 | 1.0 | 1.0 | 1.0 |
+| out_of_scope | 2 | 1.0 | None | None |
+| pii | 1 | 1.0 | 1.0 | 1.0 |
+| policy | 4 | 1.0 | 1.0 | 1.0 |
+| rbac | 4 | 1.0 | 1.0 | 1.0 |
+| regulation | 25 | 1.0 | 1.0 | 1.0 |
+| unanswerable | 3 | 1.0 | None | None |
+| versioning | 2 | 1.0 | 1.0 | 1.0 |
 
 Notes: `citation_precision` counts a cited source as correct only if it contains a gold
 evidence string, so legitimate extra citations (e.g. the internal policy cited next to the
