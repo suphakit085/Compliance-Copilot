@@ -1,18 +1,18 @@
 # syntax=docker/dockerfile:1.7
 # Web image (Next.js standalone server). Build context: web/
-FROM node:24-slim AS deps
+FROM node:26-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:24-slim AS build
+FROM node:26-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build && mkdir -p public
 
-FROM node:24-slim
+FROM node:26-slim
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 \
     COPILOT_API_URL=http://api:8000
