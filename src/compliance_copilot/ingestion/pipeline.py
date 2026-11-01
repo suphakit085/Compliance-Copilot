@@ -15,6 +15,7 @@ import httpx
 import yaml
 from sqlalchemy import delete
 
+from .. import governance
 from ..config import get_settings
 from ..db import CLEARANCE, Chunk, Document, init_db, session
 from ..retrieval import models
@@ -78,6 +79,7 @@ def _document_row(spec: SourceSpec, sha: str, page_count: int, quality: dict) ->
         official_ref=m.get("official_ref") or m.get("consolidated_through"),
         official_url=m.get("official_url"), sha256=sha, synthetic=bool(m.get("synthetic")),
         page_count=page_count,
+        governance=governance.to_record(m) if spec.source_kind == "internal" else {},
         quality={**quality, "pipeline": PIPELINE_VERSION,
                  "consolidated_through": m.get("consolidated_through")},
     )
@@ -92,8 +94,18 @@ def ingest(
     init_db()
     s = get_settings()
     stats: dict[str, int] = {}
-    for spec in load_manifest():
+    specs = load_manifest()
+    governance.validate(specs)  # every internal document needs an owner, an approver and a review date
+    for spec in specs:
         if doc_ids and spec.id not in doc_ids:
+            continue
+        if spec.source_kind == "internal" and spec.meta.get("status") != "approved":
+            with session() as db:  # drafts and retired documents must not be searchable
+                if db.get(Document, spec.id):
+                    db.delete(db.get(Document, spec.id))
+                    log(f"removed {spec.id} from the index (status: {spec.meta.get('status')})")
+                else:
+                    log(f"skip {spec.id} (status: {spec.meta.get('status')} - not approved)")
             continue
         if not spec.path.exists():
             log(f"MISSING {spec.id}: {spec.path} (run `copilot fetch`)")

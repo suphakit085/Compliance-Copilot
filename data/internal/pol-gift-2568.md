@@ -12,6 +12,10 @@ version: "2.0"
 published_on: 2025-06-01
 effective_from: 2025-07-01
 supersedes: pol-gift-2566
+approved_by: คณะกรรมการบริหารความเสี่ยง (ตัวอย่าง)
+approved_on: 2025-06-20
+review_due: 2027-06-20
+status: approved
 synthetic: true
 ---
 

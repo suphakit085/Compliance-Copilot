@@ -38,6 +38,64 @@ def ingest(
     run(doc_ids=doc, force=force, use_ocr=ocr, log=console.print)
 
 
+@app.command("add-policy")
+def add_policy(
+    file: Annotated[str, typer.Argument(help="Policy markdown file with governance front matter")],
+    replace: Annotated[bool, typer.Option(help="Overwrite an existing document with the same id")] = False,
+    dry_run: Annotated[bool, typer.Option(help="Validate and preview the clauses only")] = False,
+) -> None:
+    """Add an approved internal policy: validates owner/approver/review dates, then indexes it."""
+    from pathlib import Path
+
+    from .governance import GovernanceError
+    from .ingestion.updates import add_policy as run
+
+    try:
+        run(Path(file), replace=replace, dry_run=dry_run, log=console.print)
+    except GovernanceError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
+
+
+@app.command("check-updates")
+def check_updates() -> None:
+    """Compare the public sources with their pinned hashes (exit 1 if any changed). Read-only."""
+    from .ingestion.updates import check_updates as run
+
+    results = run(log=console.print)
+    changed = [r.doc_id for r in results if r.status == "changed"]
+    if changed:
+        console.print(f"[yellow]changed at the publisher: {', '.join(changed)} - review, then "
+                      "`copilot fetch --force` and `copilot ingest`[/yellow]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def governance() -> None:
+    """Corpus governance report: reviews due, drafts, sample documents, sources not re-verified."""
+    from . import governance as gov
+    from .ingestion.loaders import load_manifest
+    from .ingestion.updates import stale_sources
+
+    table = Table(title="Internal documents")
+    for c in ("id", "owner", "approved by", "status", "review due", "state"):
+        table.add_column(c)
+    specs = [s for s in load_manifest() if s.source_kind == "internal"]
+    for s in specs:
+        r = gov.review_state(s.meta)
+        colour = {"overdue": "red", "due_soon": "yellow"}.get(r.state, "green")
+        table.add_row(s.id, str(s.meta.get("owner")), str(s.meta.get("approved_by")), str(s.meta.get("status")),
+                      str(s.meta.get("review_due")), f"[{colour}]{r.state}[/{colour}]")
+    console.print(table)
+    sample = sum(bool(s.meta.get("synthetic")) for s in specs)
+    if sample:
+        console.print(f"[yellow]{sample} of {len(specs)} internal documents are synthetic samples - "
+                      "replace them with approved policies before production[/yellow]")
+    if stale := stale_sources():
+        console.print(f"[yellow]not verified against the publisher for >{90} days: {', '.join(stale)} "
+                      "(run `copilot check-updates`)[/yellow]")
+
+
 @app.command("seed-users")
 def seed_users() -> None:
     """Create/update demo users from config/users.yaml."""

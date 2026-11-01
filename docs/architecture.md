@@ -85,6 +85,15 @@ username: an IdP user called `somchai` becomes `somchai.sso` and cannot touch th
 account. SSO accounts have no password and cannot use the demo login. After sign-in the
 user holds the same session token as before, so RBAC, RLS and audit are unchanged.
 
+### Governance gates the index
+Internal documents carry `owner`, `approved_by`, `approved_on`, `review_due` and `status` in their
+front matter. `governance.validate` runs at the start of every ingest and fails with *all*
+problems at once; `status != approved` documents are never indexed and are deleted from the index
+if they were (drafts, withdrawn). Replaced versions stay `approved` and are retired by
+`effective_to`, so "as of" queries keep working - and are exempt from review reminders. Stored in
+`documents.governance` (JSONB) and shown in the document register. Public sources are pinned by
+SHA-256; `check-updates` compares them read-only with the publisher and stamps `checked_at`.
+
 ### Verify citations in code, not by trusting the model
 The model returns `{answer, citations: [{source_id, quote}]}`. Each quote must be found in
 the cited source (exact, whitespace-insensitive for Thai, or ≥ 85% contiguous match).

@@ -13,6 +13,10 @@ published_on: 2022-12-01
 effective_from: 2023-01-01
 effective_to: 2025-07-01
 superseded_by: pol-gift-2568
+approved_by: คณะกรรมการบริหารความเสี่ยง (ตัวอย่าง)
+approved_on: 2023-06-20
+review_due: 2024-06-20
+status: approved
 synthetic: true
 ---
 

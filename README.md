@@ -47,6 +47,9 @@ citation is *checked against the source text by code* before it is shown.
   retention period, and kept separate from the append-only audit trail.
 - **Tamper-evident audit trail** — every question/answer/retrieval is logged in a SHA-256
   hash chain; editing any historical row is detectable.
+- **Document governance** — internal policies cannot enter the index without an owner, approver,
+  approval date and review date; only `approved` ones are searchable, review reminders show in
+  the UI, and `copilot check-updates` detects when a regulator changes a pinned source.
 - **Policy Gap Analysis** — checks each clause of an internal policy against the
   regulations in force and produces a reviewable worklist with verified citations.
 - **Evaluation harness** — 51-question golden set plus a 21-question held-out set,
@@ -165,7 +168,7 @@ flowchart LR
 | API | FastAPI, JWT, role-based endpoints | Authorisation lives server-side; the UI is untrusted |
 | Web | Next.js 16 + shadcn/ui, BFF proxy with httpOnly cookie | Session token is never readable by browser JavaScript |
 
-Details and design decisions: [`docs/architecture.md`](docs/architecture.md).
+Details and design decisions: [`docs/architecture.md`](docs/architecture.md). Roles, intake rules and decisions the organisation must make: [`docs/governance.md`](docs/governance.md) (Thai).
 
 ## Thai document processing — the unglamorous part that matters
 
@@ -222,7 +225,10 @@ uv run copilot gap pol-pdpa-001 --out gap.md
 uv run copilot eval --no-e2e          # retrieval ablation only (no LLM calls)
 uv run copilot eval --set holdout     # held-out set
 uv run copilot audit-verify
-uv run pytest                         # 73 tests (integration tests need the DB)
+uv run copilot add-policy my-policy.md --dry-run   # validate + preview a real policy before adding it
+uv run copilot check-updates          # has a regulator changed a pinned source? (read-only)
+uv run copilot governance             # reviews due, drafts, sample documents still in the corpus
+uv run pytest                         # 89 tests (integration tests need the DB)
 ```
 
 A scripted 4-minute demo walkthrough is in [`docs/demo-script.md`](docs/demo-script.md).
@@ -248,6 +254,11 @@ deliberately planted gaps for the gap-analysis demo.
 
 ## Limitations & next steps
 
+- The six internal policies are fictional samples (one review date is deliberately overdue to show the
+  reminder). Replacing them with approved policies, and choosing which further regulations the business
+  needs (e.g. the Securities and Exchange Act, banking-supervision notifications), is the organisation's
+  decision - see `docs/governance.md`. `check-updates` reports a source as *unreachable* rather than
+  unchanged when the publisher blocks it (ocs.go.th fails TLS verification on some networks).
 - Gold and held-out sets (72 questions) were written by one person; a production rollout
   needs questions sampled from real compliance queries and reviewed by the compliance team,
   and a fresh blind set after every round of fixes.

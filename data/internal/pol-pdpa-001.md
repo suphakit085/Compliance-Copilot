@@ -11,6 +11,10 @@ sectors: [banking]
 version: "2.0"
 published_on: 2024-03-01
 effective_from: 2024-04-01
+approved_by: คณะกรรมการบริหารความเสี่ยง (ตัวอย่าง)
+approved_on: 2024-03-20
+review_due: 2026-12-15
+status: approved
 synthetic: true
 ---
 

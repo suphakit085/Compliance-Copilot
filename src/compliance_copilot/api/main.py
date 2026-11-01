@@ -16,12 +16,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 
-from .. import __version__, audit, history, llm, sso
+from .. import __version__, audit, governance, history, llm, sso
 from ..config import ROOT, get_settings
 from ..db import AuditLog, Chunk, Document, Feedback, as_reader, engine, init_db, session
 from ..features import gap_analysis
 from ..generation.answerer import ChatResponse, answer_question
 from ..guardrails.pii import mask_pii
+from ..ingestion.updates import read_lock
 from ..retrieval import models
 from ..retrieval.retriever import UserContext
 from ..security import ROLES_AUDIT, ROLES_GAP, authenticate, issue_token, user_from_token
@@ -250,6 +251,13 @@ def _visible(user: UserContext):
     )
 
 
+def _review(d: Document, today: date) -> dict[str, Any]:
+    if d.source_kind != "internal" or not d.governance:
+        return {}
+    r = governance.review_state({**d.governance, "effective_to": d.effective_to}, today)  # expired = no review
+    return {"review_state": r.state, "review_days_left": r.days_left}
+
+
 @app.get("/documents", tags=["documents"])
 def documents(user: Annotated[UserContext, Depends(current_user)]) -> list[dict[str, Any]]:
     with session() as db:
@@ -261,8 +269,12 @@ def documents(user: Annotated[UserContext, Depends(current_user)]) -> list[dict[
             .order_by(Document.source_kind.desc(), Document.id)
         ).all()
         today = date.today()
+        lock = read_lock()
         return [
             {
+                "governance": {**(d.governance or {}), **_review(d, today)},
+                "source_checked_at": (lock.get(d.id) or {}).get("checked_at")
+                or (lock.get(d.id) or {}).get("retrieved_at"),
                 "id": d.id, "title": d.title, "short_title": d.short_title, "doc_type": d.doc_type,
                 "source_kind": d.source_kind, "issuer": d.issuer, "classification": d.classification,
                 "version": d.version, "effective_from": d.effective_from, "effective_to": d.effective_to,
