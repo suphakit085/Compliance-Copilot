@@ -38,6 +38,7 @@ sequenceDiagram
 | `users` | Demo identities: role, department, clearance (scrypt password hashes) |
 | `audit_log` | Append-only events with `prev_hash` / `hash` (SHA-256 chain) |
 | `feedback` | 👍/👎 per audited answer |
+| `conversations`, `conversation_messages` | Per-user chat history: masked questions + full answers with sources; owner-only; purged after `COPILOT_CHAT_RETENTION_DAYS` |
 
 ## 3. Key decisions
 
@@ -85,6 +86,15 @@ entries so pending amendments are surfaced as warnings.
 transaction-scoped advisory lock. Records store masked questions, retrieved chunk ids and
 scores, cited chunks, model and prompt versions, latency and token use — enough to
 reconstruct any answer.
+
+### Chat history separate from the audit trail
+The audit log must be append-only for oversight; a user's chat history must be deletable
+(PDPA data-subject rights). Keeping them in separate tables satisfies both: deleting a
+conversation removes it from the user's view while the masked audit record - and an audit
+event recording the deletion - remain. History stores masked questions only, is owner-only
+(404 for anyone else), re-filters sources against the user's *current* clearance when
+reopened (an answer that cited a now-forbidden source is withheld), is used only for
+follow-up context and never as a knowledge source, and is purged after the retention period.
 
 ### LLM provider abstraction
 The app needs only "JSON output against a schema" and "text from images". Gemini and Claude

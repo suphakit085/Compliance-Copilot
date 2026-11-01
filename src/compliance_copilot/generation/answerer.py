@@ -64,6 +64,7 @@ class ChatResponse(BaseModel):
     standalone_question: str
     as_of: str
     audit_id: int | None = None
+    conversation_id: str | None = None
     pii_masked: dict[str, int] = {}
     guard_flags: list[str] = []
     grounding: dict[str, Any] = {}

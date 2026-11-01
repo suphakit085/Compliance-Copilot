@@ -11,6 +11,7 @@ import { api, CLEARANCE_LABEL, ROLE_LABEL, type Role, type User } from "@/lib/ap
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { HistoryList } from "@/components/history-list";
 
 const UserContext = createContext<User | null>(null);
 export const useUser = () => useContext(UserContext);
@@ -74,9 +75,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="px-5 py-5">
         <Logo />
       </div>
-      <nav className="flex-1 space-y-1 px-3">
+      <nav className="shrink-0 space-y-1 px-3">
         {nav.map((n) => {
-          const active = n.href === "/" ? pathname === "/" : pathname.startsWith(n.href);
+          const active = n.href === "/" ? pathname === "/" || pathname.startsWith("/c/") : pathname.startsWith(n.href);
           return (
             <Link
               key={n.href}
@@ -95,6 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
+      <HistoryList onNavigate={() => setNavOpen(false)} />
       <div className="space-y-3 border-t p-4">
         {health && (
           <div className="space-y-1 text-xs text-muted-foreground">

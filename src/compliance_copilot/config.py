@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-change-me"
     jwt_ttl_minutes: int = 480
     pii_masking: bool = True
+    # Chat history retention (days); set by the DPO / legal team. 0 disables saving history.
+    chat_retention_days: int = 90
 
     @property
     def raw_dir(self) -> Path:

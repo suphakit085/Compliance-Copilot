@@ -129,6 +129,14 @@ def evaluate(
     console.print("report: docs/eval-report.md")
 
 
+@app.command("purge-history")
+def purge_history() -> None:
+    """Delete conversations older than the retention period (COPILOT_CHAT_RETENTION_DAYS)."""
+    from .history import purge_expired
+
+    console.print(f"purged {purge_expired()} conversations")
+
+
 @app.command("audit-verify")
 def audit_verify() -> None:
     """Re-walk the audit hash chain and report tampering."""
