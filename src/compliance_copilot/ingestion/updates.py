@@ -22,10 +22,10 @@ import yaml
 
 from .. import governance
 from ..config import get_settings
+from . import http
 from .chunker import structured_chunks
 from .loaders import SourceSpec, _as_date, _split_front_matter, load_document
 
-_UA = "Mozilla/5.0 (compliance-copilot corpus checker; +https://github.com/)"
 STALE_AFTER_DAYS = 90
 
 
@@ -52,7 +52,7 @@ def check_updates(
     lock = read_lock()
     manifest = yaml.safe_load((s.data_dir / "sources.yaml").read_text(encoding="utf-8"))
     own = client is None
-    client = client or httpx.Client(follow_redirects=True, timeout=120, headers={"User-Agent": _UA})
+    client = client or http.client()
     results: list[UpdateResult] = []
     try:
         for d in manifest["documents"]:
