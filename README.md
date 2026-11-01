@@ -24,6 +24,9 @@ citation is *checked against the source text by code* before it is shown.
 - **Abstains** when evidence is weak (calibrated reranker threshold) instead of guessing.
 - **Guardrails** — PII (Thai national ID with checksum, phone, account, card with Luhn,
   names) is masked *before* the LLM call; prompt-injection attempts are refused.
+- **Private chat history** — saved per user with PII already masked, re-checked against
+  the user's *current* permissions when reopened, deletable by the user (PDPA), purged after a
+  retention period, and kept separate from the append-only audit trail.
 - **Tamper-evident audit trail** — every question/answer/retrieval is logged in a SHA-256
   hash chain; editing any historical row is detectable.
 - **Policy Gap Analysis** — checks each clause of an internal policy against the
