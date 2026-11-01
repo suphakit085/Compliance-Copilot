@@ -15,6 +15,7 @@ configuration change.
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol, TypeVar
 
@@ -31,6 +32,11 @@ class LLMError(RuntimeError):
 
 class QuotaExceeded(LLMError):
     """Daily/plan quota exhausted - retrying will not help until the quota resets."""
+
+
+class StreamReset:
+    """Emitted by a streaming provider that restarted a generation after text had already been
+    delivered (e.g. the API dropped the stream with a 503). Consumers discard what they have."""
 
 
 @dataclass
@@ -112,6 +118,56 @@ class GeminiProvider:
             if resp.prompt_feedback and resp.prompt_feedback.block_reason:
                 raise LLMError(f"Gemini blocked the prompt: {resp.prompt_feedback.block_reason}")
             return resp, usage
+        raise LLMError("Gemini API: retries exhausted")
+
+    def stream_json(self, system, prompt, schema, effort=None) -> Iterator[str | Usage | StreamReset]:
+        """Yield the JSON text as it is generated, then a final Usage.
+
+        Gemini sometimes drops a stream part-way with a 503 "high demand" error. The
+        generation is retried from the start; if text had already been yielded, a
+        ``StreamReset`` tells the consumer to throw that partial text away first.
+        """
+        from google.genai import errors, types
+
+        cfg = types.GenerateContentConfig(
+            system_instruction=system, max_output_tokens=self.max_output_tokens,
+            response_mime_type="application/json", response_schema=schema,
+            **({"thinking_config": types.ThinkingConfig(thinking_level=effort.upper())} if effort else {}),
+        )
+        delay, started = 2.0, time.perf_counter()
+        for attempt in range(5):
+            sent = False
+            meta = None
+            model_version = None
+            try:
+                for chunk in self.client.models.generate_content_stream(
+                    model=self.model, contents=[prompt], config=cfg
+                ):
+                    if chunk.prompt_feedback and chunk.prompt_feedback.block_reason:
+                        raise LLMError(f"Gemini blocked the prompt: {chunk.prompt_feedback.block_reason}")
+                    meta = chunk.usage_metadata or meta
+                    model_version = chunk.model_version or model_version
+                    if chunk.text:
+                        sent = True
+                        yield chunk.text
+            except errors.APIError as e:
+                msg = str(e.message or e)
+                if e.code == 429 and ("per day" in msg.lower() or "PerDay" in str(e.details)):
+                    raise QuotaExceeded(f"Gemini daily quota exhausted for {self.model}: {msg[:300]}") from e
+                if e.code in (429, 500, 502, 503, 504) and attempt < 4:
+                    if sent:
+                        yield StreamReset()
+                    time.sleep(delay)
+                    delay *= 2
+                    continue
+                raise LLMError(f"Gemini API error {e.code}: {e.message}") from e
+            yield Usage(
+                model=model_version or self.model,
+                input_tokens=(meta.prompt_token_count or 0) if meta else 0,
+                output_tokens=((meta.candidates_token_count or 0) + (meta.thoughts_token_count or 0)) if meta else 0,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+            )
+            return
         raise LLMError("Gemini API: retries exhausted")
 
     def generate_json(self, system, prompt, schema, images=None, effort=None):
@@ -258,6 +314,23 @@ class CachedProvider:
 
     def generate_text(self, system, prompt, images=None, effort=None):
         return self.inner.generate_text(system, prompt, images, effort)
+
+
+def stream_json(provider: LLMProvider, system: str, prompt: str, schema: type[T],
+                effort: str | None = None) -> Iterator[str | Usage | StreamReset]:
+    """Stream a JSON answer if the provider can; otherwise deliver it in one piece.
+
+    Items are text fragments of the JSON document, then one final ``Usage``. Providers
+    without native streaming (Claude here, the disk cache, test fakes) still work - the
+    caller simply sees the whole answer arrive at once.
+    """
+    native = getattr(provider, "stream_json", None)
+    if native is not None:
+        yield from native(system, prompt, schema, effort)
+        return
+    out, usage = provider.generate_json(system, prompt, schema, effort=effort)
+    yield out.model_dump_json()
+    yield usage
 
 
 # --------------------------------------------------------------------------- factory
