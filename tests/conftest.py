@@ -56,3 +56,13 @@ def fake_llm(monkeypatch):
     monkeypatch.setattr(llm, "available", lambda: True)
     yield fake
     llm.set_provider(None)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Rate-limit windows are process-wide; keep tests independent of each other."""
+    from compliance_copilot.ratelimit import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()

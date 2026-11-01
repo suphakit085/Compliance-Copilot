@@ -11,7 +11,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ROOT / ".env", env_prefix="COPILOT_", extra="ignore")
+    # Secrets may also be mounted as files (Docker/Kubernetes secrets): /run/secrets/copilot_jwt_secret
+    model_config = SettingsConfigDict(
+        env_file=ROOT / ".env", env_prefix="COPILOT_", extra="ignore",
+        secrets_dir="/run/secrets" if Path("/run/secrets").is_dir() else None,
+    )
+
+    # development | production. Production refuses to start with unsafe defaults (see security.py).
+    env: str = "development"
 
     # Storage
     database_url: str = "postgresql+psycopg://copilot:copilot@localhost:5433/copilot"
@@ -56,6 +63,21 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-change-me"
     jwt_ttl_minutes: int = 480
     pii_masking: bool = True
+    # Password login can be switched off once SSO is the only way in.
+    password_login: bool = True
+    # Lock an account for a while after repeated wrong passwords (an unknown username is
+    # counted the same way, so the response never reveals whether an account exists).
+    login_max_failures: int = 5
+    login_lock_minutes: int = 15
+    # Rate limits (requests per window, per signed-in user unless noted)
+    rate_user_per_min: int = 300
+    rate_chat_per_min: int = 20  # each answer is an LLM call
+    rate_gap_per_10min: int = 5  # a gap analysis is dozens of LLM calls
+    rate_login_ip_per_min: int = 20  # per client address, across all usernames
+    # Trust X-Forwarded-For for the client address. Only enable behind a proxy you control.
+    trust_proxy: bool = False
+    # Comma-separated Host headers the API answers to (empty = any). Set in production.
+    allowed_hosts: str = ""
     # Single sign-on (OpenID Connect). Leave oidc_issuer empty to use only the demo login.
     oidc_issuer: str | None = None
     oidc_client_id: str | None = None
