@@ -17,7 +17,9 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("override_en", re.compile(r"\b(ignore|disregard|forget)\b.{0,40}\b(instruction|prompt|rule|previous|above)", re.I)),
     ("role_en", re.compile(r"\b(you are now|act as|pretend to be|developer mode|jailbreak|DAN)\b", re.I)),
     ("leak_en", re.compile(r"\b(reveal|show|print|repeat)\b.{0,30}\b(system prompt|instructions|hidden prompt)", re.I)),
-    ("override_th", re.compile(r"(ไม่ต้องสนใจ|ละเว้น|ลืม|ยกเลิก|ข้าม).{0,20}(คำสั่ง|กฎ|ข้อกำหนด|ข้อจำกัด|ข้อความก่อนหน้า)")),
+    # Targets refer to the assistant's own instructions. Legal vocabulary such as
+    # "ยกเลิกกฎกระทรวง" (repeal a ministerial regulation) must not match.
+    ("override_th", re.compile(r"(ไม่ต้องสนใจ|ละเว้น|ลืม|ข้าม).{0,20}(คำสั่ง|ข้อจำกัด|ข้อความก่อนหน้า|กฎของระบบ|กฎที่ให้ไว้)")),
     ("role_th", re.compile(r"(ตอนนี้คุณคือ|จากนี้ไปคุณคือ|สวมบทบาท|ทำตัวเป็น|เปลี่ยนบทบาท)")),
     ("leak_th", re.compile(r"(แสดง|บอก|เปิดเผย|พิมพ์).{0,15}(system prompt|พรอมต์|prompt|คำสั่งระบบ|คำสั่งลับ)")),
     ("acl_bypass", re.compile(r"(ข้าม|เลี่ยง|bypass).{0,20}(สิทธิ์|สิทธิ|permission|access control|ระดับชั้นความลับ)", re.I)),

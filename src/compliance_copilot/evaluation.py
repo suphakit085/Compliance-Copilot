@@ -36,15 +36,15 @@ RESULTS = ROOT / "eval" / "results"
 
 ABLATIONS: list[tuple[str, dict[str, Any]]] = [
     ("A. Fixed-size chunks + vector only (baseline)",
-     {"strategy": "naive", "use_lexical": False, "use_refs": False, "use_rerank": False, "use_glossary": False}),
+     {"strategy": "naive", "use_lexical": False, "use_refs": False, "use_rerank": False, "use_glossary": False, "compare": False}),
     ("B. Structure-aware chunks + vector only",
-     {"strategy": "structured", "use_lexical": False, "use_refs": False, "use_rerank": False, "use_glossary": False}),
+     {"strategy": "structured", "use_lexical": False, "use_refs": False, "use_rerank": False, "use_glossary": False, "compare": False}),
     ("C. Structure-aware chunks + BM25 only",
-     {"strategy": "structured", "use_dense": False, "use_refs": False, "use_rerank": False, "use_glossary": False}),
+     {"strategy": "structured", "use_dense": False, "use_refs": False, "use_rerank": False, "use_glossary": False, "compare": False}),
     ("D. Hybrid (vector + BM25 + references, RRF)",
-     {"strategy": "structured", "use_rerank": False, "use_glossary": False}),
-    ("E. Hybrid + cross-encoder rerank", {"strategy": "structured", "use_glossary": False}),
-    ("F. E + domain glossary expansion (production)", {"strategy": "structured"}),
+     {"strategy": "structured", "use_rerank": False, "use_glossary": False, "compare": False}),
+    ("E. Hybrid + cross-encoder rerank", {"strategy": "structured", "use_glossary": False, "compare": False}),
+    ("F. E + glossary expansion + comparison lookup (production)", {"strategy": "structured"}),
 ]
 ABSTAIN_CATEGORIES = {"out_of_scope", "unanswerable"}
 

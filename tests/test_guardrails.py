@@ -51,3 +51,15 @@ def test_injection_attempts_are_blocked(attack):
 )
 def test_benign_questions_pass(benign):
     assert not screen(benign).blocked
+
+
+@pytest.mark.parametrize(
+    "legal_question",
+    [
+        "กฎกระทรวง CDD ปี 2563 ยกเลิกกฎกระทรวงฉบับใดบ้าง",  # regression: was blocked as injection
+        "ประกาศนี้ยกเลิกหนังสือเวียนฉบับใด",
+        "ลูกหนี้ละเว้นการชำระหนี้ต้องทำอย่างไร",
+    ],
+)
+def test_legal_vocabulary_is_not_injection(legal_question):
+    assert not screen(legal_question).blocked
