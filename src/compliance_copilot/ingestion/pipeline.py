@@ -11,7 +11,6 @@ import json
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-import httpx
 import yaml
 from sqlalchemy import delete
 
@@ -20,11 +19,11 @@ from ..config import get_settings
 from ..db import CLEARANCE, Chunk, Document, init_db, session
 from ..retrieval import models
 from ..retrieval.text_index import tokens_for_index
+from . import http
 from .chunker import ChunkData, naive_chunks, structured_chunks
 from .loaders import SourceSpec, load_document, load_manifest
 
 PIPELINE_VERSION = "4"
-_UA = "Mozilla/5.0 (compliance-copilot corpus fetcher; +https://github.com/)"
 
 
 def fetch_sources(force: bool = False, log: Callable[[str], None] = print) -> None:
@@ -34,7 +33,7 @@ def fetch_sources(force: bool = False, log: Callable[[str], None] = print) -> No
     lock_path = s.raw_dir / "manifest.lock.json"
     lock = json.loads(lock_path.read_text(encoding="utf-8")) if lock_path.exists() else {}
     manifest = yaml.safe_load((s.data_dir / "sources.yaml").read_text(encoding="utf-8"))
-    with httpx.Client(follow_redirects=True, timeout=120, headers={"User-Agent": _UA}) as client:
+    with http.client() as client:
         for d in manifest["documents"]:
             target = s.raw_dir / f"{d['id']}.pdf"
             if target.exists() and not force:

@@ -265,7 +265,7 @@ deliberately planted gaps for the gap-analysis demo.
   reminder). Replacing them with approved policies, and choosing which further regulations the business
   needs (e.g. the Securities and Exchange Act, banking-supervision notifications), is the organisation's
   decision - see `docs/governance.md`. `check-updates` reports a source as *unreachable* rather than
-  unchanged when the publisher blocks it (ocs.go.th fails TLS verification on some networks).
+  unchanged when the publisher blocks it.
 - Gold and held-out sets (72 questions) were written by one person; a production rollout
   needs questions sampled from real compliance queries and reviewed by the compliance team,
   and a fresh blind set after every round of fixes.
@@ -278,7 +278,7 @@ deliberately planted gaps for the gap-analysis demo.
   document reads; user-owned tables (chat history, feedback) are still protected in the API only.
 - Capacity: one API process handles about 2 questions/second of retrieval on an 8 GB GPU (the models
   sit behind one lock); CPU-only is ~20x slower and only fit for demos. Scale with one replica per
-  GPU - see `docs/deployment.md`. The CI workflows pass `actionlint` but have not yet run on GitHub.
+  GPU - see `docs/deployment.md`.
 - Production hardening: an on-prem LLM option for data residency, scheduled re-ingestion when regulators publish amendments.
 
 ## Project layout

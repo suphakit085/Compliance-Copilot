@@ -74,7 +74,11 @@ are not part of a database dump.
 
 Deployment (pushing images to the bank's registry and rolling them out) is deliberately not in
 this repository: it depends on the target platform and its change-approval process.
-The workflows pass `actionlint`; they have not yet run on GitHub.
+The workflows pass `actionlint`. Their first run on GitHub found two problems that local checks
+had hidden, both fixed: route types (`PageProps`/`LayoutProps`) only exist after `next typegen`, so
+a clean checkout failed the type check; and `www.ocs.go.th` omits its intermediate certificate,
+which Windows fetches silently but Linux does not - the intermediate is now shipped in `config/ca/`
+(verification stays on, see its README).
 
 ## 3. Monitoring
 
