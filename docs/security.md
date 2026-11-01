@@ -18,6 +18,21 @@ still open. Dependency scan results are dated; re-run them before every release.
 | Start-up safety | With `COPILOT_ENV=production` the API refuses to start if the JWT secret is the default or shorter than 32 characters, or if any demo account still has its published password (unless password login is off) | `security.check_production_ready` |
 | Audit | Hash-chained log of logins, failures, lockouts, rate-limit violations, questions, answers | `audit.py` |
 
+## What leaves the building: the LLM provider
+
+Per question the provider receives: the user's question **after PII masking**, the retrieved
+passages the user is *already cleared to read*, and a fixed system prompt. It never receives
+other users' data, chat history beyond the last six masked turns, documents above the user's
+clearance, or unmasked national IDs/phones/accounts/cards. Embeddings and reranking run locally.
+Gemini is the default; `COPILOT_LLM_PROVIDER=anthropic` switches provider (it answers without
+token streaming: the whole answer arrives at once).
+
+Decisions for the bank, not the code: which provider and region are approved; a contract with
+**zero data retention** and no training on prompts; a paid tier (the free tier allows about 20
+requests/day per model, so answers fall back to showing source text when it runs out); and
+whether confidential internal manuals may be sent to an external provider at all - if not,
+use an on-premises model behind the same `LLMProvider` interface.
+
 ## Expected from the deployment
 
 - **TLS** terminates at a reverse proxy / ingress in front of both services. Set
