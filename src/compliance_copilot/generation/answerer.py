@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from .. import audit, llm
+from .. import audit, llm, observability
 from ..config import get_settings
 from ..guardrails import input_guard
 from ..guardrails.pii import mask_pii
@@ -178,6 +178,7 @@ def _generate(
             continue
         if isinstance(item, llm.StreamReset):  # the provider restarted: forget the partial draft
             parts.clear()
+            observability.STREAM_RESETS.inc()
             extractor = AnswerStream()
             delivered.append("\n[--- stream restarted ---]\n")
             yield {"type": "reset"}
@@ -228,6 +229,7 @@ def stream_answer(
         )
         if log:
             resp.audit_id = audit.log_event("chat", _audit_payload(resp, q, None, None, 0), user)
+        observability.record_chat(resp, time.perf_counter() - started)
         yield {"type": "final", "response": resp}
         return
 
@@ -289,6 +291,8 @@ def stream_answer(
         usage_total = _add(usage_total, u)
     except GeneratorExit:
         # The reader went away mid-answer. Text it already received must not be unaccounted for.
+        if delivered:
+            observability.INTERRUPTED.inc()
         if log and delivered:
             audit.log_event("chat_interrupted", {
                 "question_masked": q, "standalone_question": standalone, "as_of": as_of.isoformat(),
@@ -354,6 +358,7 @@ def _finish(resp: ChatResponse, q: str, retrieval: RetrievalResult | None, usage
             started: float, user: UserContext, log: bool) -> ChatResponse:
     latency = int((time.perf_counter() - started) * 1000)
     resp.trace["latency_ms"] = latency
+    observability.record_chat(resp, latency / 1000)
     if log:
         resp.audit_id = audit.log_event("chat", _audit_payload(resp, q, retrieval, usage, latency), user)
     return resp

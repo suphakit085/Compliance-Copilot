@@ -69,6 +69,13 @@ class Settings(BaseSettings):
     # counted the same way, so the response never reveals whether an account exists).
     login_max_failures: int = 5
     login_lock_minutes: int = 15
+    # Operations
+    log_format: str = "text"  # text | json (one object per line, for a log shipper)
+    log_level: str = "INFO"
+    # Bearer token for GET /metrics. Metrics are disabled (404) until one is set.
+    metrics_token: str | None = None
+    # How often the hash chain of the audit log is re-verified in the background (0 = never).
+    audit_verify_minutes: int = 60
     # Rate limits (requests per window, per signed-in user unless noted)
     rate_user_per_min: int = 300
     rate_chat_per_min: int = 20  # each answer is an LLM call

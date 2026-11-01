@@ -96,6 +96,27 @@ def governance() -> None:
                       "(run `copilot check-updates`)[/yellow]")
 
 
+@app.command("create-user")
+def create_user(
+    username: str,
+    role: Annotated[str, typer.Option(help="employee | compliance_officer | auditor | admin")] = "admin",
+    department: str = "it",
+    clearance: Annotated[str, typer.Option(help="public | internal | confidential | restricted")] = "restricted",
+    display_name: Annotated[str | None, typer.Option()] = None,
+    update: Annotated[bool, typer.Option(help="Change an existing user (e.g. reset the password)")] = False,
+    password: Annotated[str, typer.Option(prompt=True, hide_input=True, confirmation_prompt=True)] = "",
+) -> None:
+    """Create a local account, e.g. the first admin of a production deployment."""
+    from .security import create_user as run
+
+    try:
+        run(username, display_name or username, role, department, clearance, password, update=update)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
+    console.print(f"user {username} saved ({role}, {clearance})")
+
+
 @app.command("seed-users")
 def seed_users() -> None:
     """Create/update demo users from config/users.yaml."""
@@ -172,6 +193,7 @@ def evaluate(
     limit: int | None = None,
     fresh: Annotated[bool, typer.Option("--fresh", help="Re-evaluate questions already done")] = False,
     eval_set: Annotated[str, typer.Option("--set", help="main | holdout")] = "main",
+    min_hit6: Annotated[float | None, typer.Option(help="Exit 1 if production Hit@6 is below this (CI gate)")] = None,
 ) -> None:
     """Run the golden-set evaluation and write eval/results + docs/eval-report.md.
 
@@ -186,6 +208,70 @@ def evaluate(
         if e.get("remaining"):
             console.print(f"[yellow]{len(e['remaining'])} questions not evaluated yet - run again to continue[/yellow]")
     console.print(f"report: docs/eval-report{'' if eval_set == 'main' else '-' + eval_set}.md")
+    if min_hit6 is not None and retrieval:
+        prod = out["retrieval_ablation"][-1]
+        ok = prod["hit@6"] >= min_hit6
+        console.print(f"[{'green' if ok else 'red'}]quality gate: production Hit@6 {prod['hit@6']:.3f} "
+                      f"{'>=' if ok else '<'} {min_hit6}[/]")
+        if not ok:
+            raise typer.Exit(1)
+
+
+@app.command()
+def bench(
+    concurrency: Annotated[str, typer.Option(help="Comma-separated numbers of simultaneous users")] = "1,4,8",
+    requests: Annotated[int, typer.Option(help="Questions per level")] = 24,
+    user: str = "nida",
+) -> None:
+    """Capacity check of the local part of answering (embedding + hybrid search + rerank; no LLM)."""
+    import statistics
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    import yaml
+    from sqlalchemy import select
+
+    from .config import ROOT
+    from .db import User, session
+    from .retrieval import models
+    from .retrieval.retriever import retrieve
+    from .security import to_context
+
+    with session() as db:
+        ctx = to_context(db.execute(select(User).where(User.username == user)).scalar_one())
+    items = yaml.safe_load((ROOT / "eval" / "golden_set.yaml").read_text(encoding="utf-8"))["items"]
+    questions = [i["question"] for i in items]
+    device = models._device()
+    t0 = time.perf_counter()
+    models.embed_query("warm up")
+    models.rerank("warm up", ["warm up"])
+    load_s = time.perf_counter() - t0
+    torch = None
+    if device == "cuda":
+        import torch
+
+        torch.cuda.reset_peak_memory_stats()
+
+    table = Table(title=f"Retrieval capacity on {device} (model load {load_s:.1f}s)")
+    for col in ("users", "requests", "p50 ms", "p95 ms", "throughput /s"):
+        table.add_column(col, justify="right")
+    for level in [int(x) for x in concurrency.split(",")]:
+        qs = [questions[i % len(questions)] for i in range(requests)]
+
+        def one(q: str) -> float:
+            s = time.perf_counter()
+            retrieve(q, ctx)
+            return (time.perf_counter() - s) * 1000
+
+        start = time.perf_counter()
+        with ThreadPoolExecutor(max_workers=level) as pool:
+            lat = sorted(pool.map(one, qs))
+        wall = time.perf_counter() - start
+        p95 = lat[min(len(lat) - 1, int(round(0.95 * len(lat))) - 1)]
+        table.add_row(str(level), str(requests), f"{statistics.median(lat):.0f}", f"{p95:.0f}", f"{requests / wall:.2f}")
+    console.print(table)
+    if torch is not None:
+        console.print(f"peak GPU memory for the two models + inference: {torch.cuda.max_memory_allocated() / 2**30:.2f} GiB")
 
 
 @app.command("purge-history")
