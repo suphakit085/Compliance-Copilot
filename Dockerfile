@@ -8,7 +8,7 @@
 # The retrieval models (BGE-M3, bge-reranker-v2-m3, ~4.5 GB) are NOT baked in: they are
 # downloaded once into the /models volume (HF_HOME) on first start, or mounted.
 
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 ENV UV_LINK_MODE=copy PIP_NO_CACHE_DIR=1
 RUN pip install uv==0.12.13
@@ -23,7 +23,7 @@ RUN uv venv /opt/venv \
       | grep -Ev '^(torch|nvidia-|cuda-|triton|pytorch-triton)' > requirements.txt \
  && uv pip install --python /opt/venv/bin/python -r requirements.txt
 
-FROM python:3.12-slim
+FROM python:3.15-slim
 # libgomp: OpenMP runtime used by PyTorch CPU kernels
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
  && rm -rf /var/lib/apt/lists/* \
