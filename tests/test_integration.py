@@ -107,3 +107,45 @@ def test_comparison_question_brings_in_the_governing_law(corpus):
     r = retrieve("นโยบาย AML ของธนาคารกำหนดระยะเวลาเก็บข้อมูล CDD สอดคล้องกับกฎหมายหรือไม่", COMPLIANCE)
     docs = _docs(r)
     assert "pol-aml-001" in docs and "amla-2542" in docs
+
+
+def test_chat_history_is_private_masked_and_rechecks_permissions(corpus, fake_llm):
+    from compliance_copilot.api.main import app
+    from compliance_copilot.db import User, session
+    from compliance_copilot.security import seed_users
+
+    seed_users()
+    with TestClient(app) as client:
+        def login(u, p):
+            tok = client.post("/auth/login", json={"username": u, "password": p}).json()["access_token"]
+            return {"Authorization": f"Bearer {tok}"}
+
+        nida, somchai = login("nida", "demo-compliance"), login("somchai", "demo-employee")
+        r = client.post("/chat", headers=nida, json={"question": f"{STR_Q} ลูกค้าโทร 081-234-5678"}).json()
+        conv = r["conversation_id"]
+        assert conv and any(s["document_id"] == "proc-str-001" for s in r["sources"])
+
+        # follow-up joins the same conversation
+        client.post("/chat", headers=nida, json={"question": "แล้ว L1 ล่ะ", "conversation_id": conv})
+        data = client.get(f"/conversations/{conv}", headers=nida).json()
+        assert len(data["messages"]) == 4
+        assert "081-234-5678" not in data["messages"][0]["content"]  # stored masked
+        assert any(c["id"] == conv for c in client.get("/conversations", headers=nida).json())
+
+        # other users cannot see, rename or delete it
+        assert client.get(f"/conversations/{conv}", headers=somchai).status_code == 404
+        assert client.post(f"/conversations/{conv}/delete", headers=somchai).status_code == 404
+
+        # clearance revoked -> the confidential source and the answer citing it are withheld
+        with session() as db:
+            u = db.query(User).filter_by(username="nida").one()
+            u.clearance = 1
+        try:
+            msg = client.get(f"/conversations/{conv}", headers=nida).json()["messages"][1]["response"]
+            assert all(s["document_id"] != "proc-str-001" for s in msg["sources"])
+            assert "ถูกซ่อน" in msg["answer"]
+        finally:
+            seed_users()  # restore demo clearances
+
+        assert client.post(f"/conversations/{conv}/delete", headers=nida).json()["ok"]
+        assert client.get(f"/conversations/{conv}", headers=nida).status_code == 404

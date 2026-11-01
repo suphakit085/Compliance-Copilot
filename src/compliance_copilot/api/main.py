@@ -16,11 +16,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 
-from .. import __version__, audit, llm
+from .. import __version__, audit, history, llm
 from ..config import ROOT, get_settings
 from ..db import AuditLog, Chunk, Document, Feedback, engine, init_db, session
 from ..features import gap_analysis
 from ..generation.answerer import ChatResponse, answer_question
+from ..guardrails.pii import mask_pii
 from ..retrieval import models
 from ..retrieval.retriever import UserContext
 from ..security import ROLES_AUDIT, ROLES_GAP, authenticate, issue_token, user_from_token
@@ -32,6 +33,7 @@ _models_ready = threading.Event()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    history.purge_expired()
 
     def warm() -> None:  # load embedding + reranker models in the background
         models.embed_query("warm up")
@@ -121,15 +123,60 @@ class Turn(BaseModel):
 
 class ChatIn(BaseModel):
     question: str = Field(min_length=2, max_length=2000)
-    history: list[Turn] = []
+    history: list[Turn] = []  # used only when there is no saved conversation
     as_of: date | None = None
+    conversation_id: str | None = None
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["chat"])
 def chat(body: ChatIn, user: Annotated[UserContext, Depends(current_user)]) -> ChatResponse:
-    return answer_question(
-        body.question, user, [t.model_dump() for t in body.history[-6:]], body.as_of
-    )
+    if not history.enabled():
+        return answer_question(body.question, user, [t.model_dump() for t in body.history[-6:]], body.as_of)
+    # Follow-up context comes from the server-side record, not from the client.
+    turns = history.recent_turns(user, body.conversation_id) if body.conversation_id else []
+    resp = answer_question(body.question, user, turns, body.as_of)
+    conv_id = history.get_or_create(user, body.conversation_id, mask_pii(body.question).text)
+    history.append(conv_id, mask_pii(body.question).text, resp.model_dump(mode="json"))
+    resp.conversation_id = conv_id
+    return resp
+
+
+# ------------------------------------------------------------------------ history
+
+
+@app.get("/conversations", tags=["history"])
+def conversations(user: Annotated[UserContext, Depends(current_user)]) -> list[dict[str, Any]]:
+    return history.list_for(user)
+
+
+@app.get("/conversations/{conversation_id}", tags=["history"])
+def conversation(conversation_id: str, user: Annotated[UserContext, Depends(current_user)]) -> dict[str, Any]:
+    data = history.load(user, conversation_id)
+    if data is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+    return data
+
+
+class RenameIn(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+
+
+@app.post("/conversations/{conversation_id}/rename", tags=["history"])
+def rename_conversation(conversation_id: str, body: RenameIn,
+                        user: Annotated[UserContext, Depends(current_user)]) -> dict[str, bool]:
+    if not history.rename(user, conversation_id, body.title):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+    return {"ok": True}
+
+
+@app.post("/conversations/{conversation_id}/delete", tags=["history"])
+def delete_conversation(conversation_id: str,
+                        user: Annotated[UserContext, Depends(current_user)]) -> dict[str, bool]:
+    if not history.remove(user, conversation_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+    # The deletion itself is audited; the audit trail keeps its own masked records.
+    audit.log_event("conversation_deleted", {"conversation_id": conversation_id}, user)
+    return {"ok": True}
 
 
 class FeedbackIn(BaseModel):
