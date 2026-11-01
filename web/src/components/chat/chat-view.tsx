@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowUp, BookMarked, CalendarClock, Gift, HandCoins, Landmark, Loader2, RotateCcw, Scale, ShieldCheck,
 } from "lucide-react";
@@ -8,6 +9,7 @@ import { api, type ChatResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/components/app-shell";
 import { useToday } from "@/lib/use-today";
+import { CONVERSATIONS_CHANGED } from "@/lib/events";
 import { Answer } from "@/components/chat/answer";
 import { SourceCard } from "@/components/chat/source-card";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -110,9 +112,17 @@ function Composer({
   );
 }
 
-export default function ChatPage() {
+/** Messages handed over when a new chat gets its id, so /c/<id> renders without a refetch flash. */
+const handover = new Map<string, Msg[]>();
+
+
+export function ChatView({ conversationId }: { conversationId?: string }) {
   const user = useUser();
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const router = useRouter();
+  const [messages, setMessages] = useState<Msg[]>(() => (conversationId && handover.get(conversationId)) || []);
+  const [historyState, setHistoryState] = useState<"idle" | "loading" | "missing">(
+    conversationId && !handover.has(conversationId) ? "loading" : "idle",
+  );
   const [input, setInput] = useState("");
   const today = useToday();
   const [asOfChoice, setAsOf] = useState<string | null>(null);
@@ -133,17 +143,36 @@ export default function ChatPage() {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, loading]);
 
+  // Open a saved conversation (the server re-checks access to every cited source).
+  useEffect(() => {
+    if (!conversationId || handover.delete(conversationId)) return;
+    let stale = false;
+    api<{ messages: Msg[] }>(`/conversations/${conversationId}`)
+      .then((d) => { if (!stale) { setMessages(d.messages); setHistoryState("idle"); } })
+      .catch(() => { if (!stale) setHistoryState("missing"); });
+    return () => { stale = true; };
+  }, [conversationId]);
+
   async function send(text: string) {
     const question = text.trim();
     if (!question || loading) return;
     const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
-    setMessages((m) => [...m, { role: "user", content: question }]);
+    const next: Msg[] = [...messages, { role: "user", content: question }];
+    setMessages(next);
     setInput("");
     setLoading(true);
     try {
-      const r = await api<ChatResponse>("/chat", { body: { question, history, as_of: asOf || undefined } });
-      setMessages((m) => [...m, { role: "assistant", content: r.answer, response: r }]);
+      const r = await api<ChatResponse>("/chat", {
+        body: { question, history, as_of: asOf || undefined, conversation_id: conversationId },
+      });
+      const all: Msg[] = [...next, { role: "assistant", content: r.answer, response: r }];
+      setMessages(all);
       setSelected(null);
+      window.dispatchEvent(new Event(CONVERSATIONS_CHANGED));
+      if (r.conversation_id && r.conversation_id !== conversationId) {
+        handover.set(r.conversation_id, all);
+        router.replace(`/c/${r.conversation_id}`);
+      }
     } catch (e) {
       const err = e instanceof Error ? e.message : "เกิดข้อผิดพลาด";
       setMessages((m) => [...m, {
@@ -211,7 +240,7 @@ export default function ChatPage() {
   );
 
   const verifiedOf = (r: ChatResponse) => new Set(r.sources.filter((s) => s.cited).map((s) => s.id));
-  const empty = messages.length === 0;
+  const empty = messages.length === 0 && historyState === "idle";
 
   return (
     <div className="flex h-full">
@@ -224,7 +253,7 @@ export default function ChatPage() {
           </div>
           {!empty && (
             <button
-              onClick={() => { setMessages([]); setSelected(null); }}
+              onClick={() => router.push("/")}
               className="flex items-center gap-1.5 rounded-[10px] border bg-card px-3 py-1.5 text-xs text-muted-foreground transition hover:text-foreground"
             >
               <RotateCcw className="size-3.5" /> แชทใหม่
@@ -232,7 +261,15 @@ export default function ChatPage() {
           )}
         </div>
 
-        {empty ? (
+        {historyState !== "idle" ? (
+          <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
+            {historyState === "loading" ? (
+              <span className="flex items-center gap-2"><Loader2 className="size-4 animate-spin text-brand" /> กำลังเปิดบทสนทนา…</span>
+            ) : (
+              <span>ไม่พบบทสนทนานี้ อาจถูกลบหรือหมดอายุการเก็บรักษาแล้ว</span>
+            )}
+          </div>
+        ) : empty ? (
           <div className="relative flex flex-1 flex-col items-center overflow-y-auto px-4 pb-10 pt-[4vh] sm:px-6 sm:pt-[8vh]">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1 text-[11px] text-muted-foreground backdrop-blur sm:mb-6 sm:text-xs">
               <span className="size-1.5 rounded-full bg-brand shadow-[0_0_8px_#0099ff]" />

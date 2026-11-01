@@ -6,7 +6,7 @@ import { backendFetch, SESSION_COOKIE } from "@/lib/server";
  * Same-origin proxy to the FastAPI service. Attaches the session token from the
  * httpOnly cookie; only an allow-list of API prefixes is reachable from the browser.
  */
-const ALLOWED = ["me", "chat", "feedback", "documents", "gap-analysis", "audit", "health", "eval"];
+const ALLOWED = ["me", "chat", "conversations", "feedback", "documents", "gap-analysis", "audit", "health", "eval"];
 
 async function forward(request: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;

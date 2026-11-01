@@ -52,6 +52,7 @@ export interface ChatResponse {
   standalone_question: string;
   as_of: string;
   audit_id: number | null;
+  conversation_id?: string | null;
   pii_masked: Record<string, number>;
   guard_flags: string[];
   grounding: {
@@ -59,6 +60,13 @@ export interface ChatResponse {
     support_rate?: number; unsupported_markers?: string[];
   };
   trace: Record<string, unknown>;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  updated_at: string;
+  messages: number;
 }
 
 export interface DocumentInfo {
