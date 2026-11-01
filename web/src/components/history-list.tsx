@@ -9,6 +9,32 @@ import { api, type ConversationSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { CONVERSATIONS_CHANGED } from "@/lib/events";
 
+const DAY = 86_400_000;
+
+/** Bucket by last activity so threads with the same first question stay distinguishable. */
+function groupByDay(items: ConversationSummary[]) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const t0 = start.getTime();
+  const label = (ts: number) =>
+    ts >= t0 ? "วันนี้" : ts >= t0 - DAY ? "เมื่อวาน" : ts >= t0 - 6 * DAY ? "7 วันที่ผ่านมา" : "ก่อนหน้านี้";
+  const groups: { label: string; items: ConversationSummary[] }[] = [];
+  for (const c of items) {
+    const g = label(new Date(c.updated_at).getTime());
+    if (groups.at(-1)?.label !== g) groups.push({ label: g, items: [] });
+    groups.at(-1)!.items.push(c);
+  }
+  return groups;
+}
+
+function timeLabel(iso: string) {
+  const d = new Date(iso);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  return sameDay
+    ? d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+}
+
 /** The signed-in user's own conversations (sidebar / phone drawer). */
 export function HistoryList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -51,7 +77,10 @@ export function HistoryList({ onNavigate }: { onNavigate?: () => void }) {
         {items?.length === 0 && (
           <p className="px-3 py-2 text-xs text-muted-foreground">ยังไม่มีบทสนทนา</p>
         )}
-        {items?.map((c) => {
+        {items && groupByDay(items).map((g) => (
+          <div key={g.label} className="pb-2">
+            <p className="px-3 pb-1 pt-2 text-[10.5px] font-medium text-muted-foreground/60">{g.label}</p>
+            {g.items.map((c) => {
           const active = pathname === `/c/${c.id}`;
           return (
             <div
@@ -81,7 +110,10 @@ export function HistoryList({ onNavigate }: { onNavigate?: () => void }) {
                     )}
                   >
                     <MessageSquare className="size-3.5 shrink-0" />
-                    <span className="truncate">{c.title}</span>
+                    <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">
+                      {timeLabel(c.updated_at)}
+                    </span>
                   </Link>
                   <button
                     onClick={() => setConfirming(c.id)}
@@ -94,7 +126,9 @@ export function HistoryList({ onNavigate }: { onNavigate?: () => void }) {
               )}
             </div>
           );
-        })}
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
