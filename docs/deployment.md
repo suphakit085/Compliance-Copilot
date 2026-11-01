@@ -68,7 +68,7 @@ are not part of a database dump.
 | Workflow | When | What |
 |---|---|---|
 | `ci.yml` | every push / PR | ruff + unit tests (no database; integration tests skip), web type-check + lint + production build, both images build |
-| `integration.yml` | push to main, weekly, on demand | Postgres + pgvector service, fetch and verify the corpus, ingest, **all** tests, then a **retrieval quality gate**: production Hit@6 ≥ 0.95 on the main set and ≥ 0.90 on the held-out set (`copilot eval --no-e2e --min-hit6`) - no LLM key needed |
+| `integration.yml` | push to main, weekly, on demand | Postgres + pgvector service, fetch and verify the corpus, ingest (~18 min on a CPU runner), **all** tests (~15 min, passed), then a **retrieval quality gate** on the production configuration: Hit@6 ≥ 0.95 (main) and ≥ 0.90 (held-out) on every push, and ≥ 0.90 on the 146-question extended set weekly (~40 min). Needs no LLM key. A first version ran the whole ablation and hit the job time limit after 57 minutes in the gate; the job limit is now 150 min and a newer push cancels an older run |
 | `scheduled.yml` | weekly | `copilot check-updates` (fails if a regulator changed a pinned document), `pip-audit`, `npm audit` |
 | `dependabot.yml` | weekly/monthly | dependency, base-image and action updates |
 

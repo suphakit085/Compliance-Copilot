@@ -14,10 +14,15 @@ on:
 permissions:
   contents: read
 
+# a newer push supersedes a running integration run (it takes about an hour on a CPU runner)
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
     services:
       db:
         image: pgvector/pgvector:pg16
@@ -69,10 +74,12 @@ jobs:
         run: pytest -q -rs
       - name: Retrieval quality gate (main and held-out sets)
         run: |
-          # production configuration only: the full ablation takes over an hour on a CPU runner
+          # production configuration only (the full ablation takes over an hour on a CPU runner)
           copilot eval --no-e2e --production-only --min-hit6 0.95
           copilot eval --no-e2e --production-only --set holdout --min-hit6 0.90
-          copilot eval --no-e2e --production-only --set extended --min-hit6 0.90
+      - name: Retrieval quality gate (extended set - weekly and on demand, ~40 min on CPU)
+        if: github.event_name != 'push'
+        run: copilot eval --no-e2e --production-only --set extended --min-hit6 0.90
       - name: Keep the evaluation report
         if: always()
         uses: actions/upload-artifact@v4
