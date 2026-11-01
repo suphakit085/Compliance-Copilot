@@ -51,14 +51,14 @@ export default function EvalPage() {
     <div className="flex h-full flex-col">
       <PageHeader title="Evaluation" description="วัดคุณภาพด้วย golden set ที่ตรวจด้วยกฎตายตัว (evidence string / key facts) — ไม่พึ่ง LLM เป็นผู้ตัดสิน" />
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl space-y-6 px-8 py-6">
+        <div className="mx-auto max-w-5xl space-y-6 px-4 py-4 md:px-8 md:py-6">
           {err && <p className="text-sm text-muted-foreground">{err}</p>}
           {!ev && !err && <Skeleton className="h-64" />}
           {ev && (
             <>
               <p className="text-xs text-muted-foreground">รันเมื่อ {new Date(ev.created_at).toLocaleString("th-TH")} · golden set {ev.n_questions} คำถาม</p>
               {best && base && (
-                <div className="grid gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
                     { icon: Target, label: "Hit@6 (production)", value: pct(best["hit@6"]), sub: `baseline ${pct(base["hit@6"])}` },
                     { icon: Gauge, label: "MRR", value: best.mrr.toFixed(2), sub: `baseline ${base.mrr.toFixed(2)}` },
@@ -115,7 +115,7 @@ export default function EvalPage() {
                 <div className="panel p-5">
                   <h3 className="font-medium">End-to-end (โมเดล {ev.end_to_end.model})</h3>
                   {ev.end_to_end.stopped_early && <p className="mt-1 text-xs text-amber-600">หยุดก่อนครบ: {ev.end_to_end.stopped_early}</p>}
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {Object.entries(ev.end_to_end.summary).map(([k, v]) => (
                       <div key={k} className="rounded-lg bg-muted/50 p-3">
                         <div className="text-xs text-muted-foreground">{E2E_LABEL[k] ?? k}</div>

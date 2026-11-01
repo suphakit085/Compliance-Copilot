@@ -39,8 +39,8 @@ export default function DocumentsPage() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="คลังเอกสาร" description="แสดงเฉพาะเอกสารที่คุณมีสิทธิ์เข้าถึง · แยกเป็นหน่วยที่อ้างอิงได้ (มาตรา / ข้อ)" />
-      <div className="flex min-h-0 flex-1">
-        <div className="w-80 shrink-0 overflow-y-auto border-r p-4">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="max-h-44 shrink-0 overflow-y-auto border-b p-3 md:max-h-none md:w-80 md:border-b-0 md:border-r md:p-4">
           {!docs && <div className="space-y-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>}
           {docs && groups.map((g) => (
             <div key={g.key} className="mb-5">
@@ -71,7 +71,7 @@ export default function DocumentsPage() {
 
         <div className="min-w-0 flex-1 overflow-y-auto">
           {doc && (
-            <div className="mx-auto max-w-4xl space-y-5 px-8 py-6">
+            <div className="mx-auto max-w-4xl space-y-5 px-4 py-4 md:px-8 md:py-6">
               <div className="space-y-3">
                 <h2 className="text-lg font-semibold leading-snug">{doc.title}</h2>
                 <div className="flex flex-wrap gap-1.5">
@@ -82,7 +82,7 @@ export default function DocumentsPage() {
                   {doc.synthetic && <Badge className="bg-violet-500/10 text-violet-700 dark:text-violet-400"><FlaskConical /> เอกสารจำลองเพื่อการสาธิต</Badge>}
                   {!!doc.quality?.ocr_pages?.length && <Badge className="bg-amber-500/15 text-amber-700"><FileScan /> OCR หน้า {doc.quality.ocr_pages.join(", ")}</Badge>}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
                     ["หน้า", doc.pages ?? "-"],
                     ["หน่วยที่อ้างอิงได้", doc.chunks],

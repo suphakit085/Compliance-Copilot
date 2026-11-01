@@ -78,7 +78,7 @@ export default function GapPage() {
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl space-y-6 px-8 py-6">
+        <div className="mx-auto max-w-5xl space-y-6 px-4 py-4 md:px-8 md:py-6">
           {running && (
             <div className="flex items-center gap-3 panel p-6 text-sm text-muted-foreground">
               <Loader2 className="size-5 animate-spin text-brand" />
@@ -93,7 +93,7 @@ export default function GapPage() {
           )}
           {report && (
             <>
-              <div className="grid gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {(["conflict", "partial", "needs_review", "compliant"] as const).map((k) => {
                   const S = STATUS[k];
                   return (

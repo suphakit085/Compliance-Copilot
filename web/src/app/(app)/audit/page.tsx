@@ -77,7 +77,7 @@ export default function AuditPage() {
         </div>
       </PageHeader>
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className="min-w-0 flex-1 overflow-y-auto px-3 py-3 md:px-6 md:py-4">
           <div className="mb-3 flex flex-wrap gap-1.5">
             {EVENTS.map((e) => (
               <button
