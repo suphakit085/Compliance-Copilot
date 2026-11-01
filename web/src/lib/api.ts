@@ -164,6 +164,54 @@ export async function api<T>(path: string, init?: { method?: string; body?: unkn
   return data as T;
 }
 
+export type ChatStage = "guard" | "condense" | "retrieve" | "generate" | "verify";
+
+/** Events of POST /chat/stream. Only `final` is verified; `delta` text is a draft preview. */
+export type ChatEvent =
+  | { type: "stage"; stage: ChatStage }
+  | { type: "sources"; sources: ChatResponse["sources"]; notices: string[] }
+  | { type: "delta"; text: string }
+  | { type: "reset" } // the server restarted the generation: discard the draft so far
+  | { type: "final"; response: ChatResponse }
+  | { type: "error"; message: string };
+
+export async function streamChat(
+  body: unknown,
+  onEvent: (e: ChatEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch("/api/backend/chat/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (res.status === 401) {
+    window.location.assign(new URL("/login", window.location.origin));
+    throw new ApiError(401, "session expired");
+  }
+  if (!res.ok || !res.body) {
+    const data = await res.json().catch(() => null);
+    const detail = data && typeof data.detail === "string" ? data.detail : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+    throw new ApiError(res.status, detail);
+  }
+  // newline-delimited JSON: one event per line, possibly split across network chunks
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += value;
+    let nl: number;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (line) onEvent(JSON.parse(line));
+    }
+  }
+  if (buf.trim()) onEvent(JSON.parse(buf));
+}
+
 export const ROLE_LABEL: Record<Role, string> = {
   employee: "พนักงาน",
   compliance_officer: "เจ้าหน้าที่ Compliance",

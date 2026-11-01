@@ -85,6 +85,25 @@ username: an IdP user called `somchai` becomes `somchai.sso` and cannot touch th
 account. SSO accounts have no password and cannot use the demo login. After sign-in the
 user holds the same session token as before, so RBAC, RLS and audit are unchanged.
 
+### Streaming without giving up verification
+Waiting 5-30 s for a blank screen is poor, but the design rule is *no verifiable evidence → no
+answer*, and a quote can only be checked once the model has finished. `POST /chat/stream`
+therefore sends newline-delimited JSON events in the order the work happens: `stage`
+(guard → retrieve → generate → verify), `sources` (the permission-filtered passages, as soon
+as retrieval ends - about a second in), `delta` (the answer text as it is written) and a
+`final` event with the verified response. The UI labels the streamed text *"draft - citations
+not yet checked"* and replaces it with the final answer; if verification fails the final
+answer is the source text, not the draft. Consequences handled in code:
+
+- the provider drops the stream mid-way (Gemini 503 "high demand"): the generation is
+  restarted and a `reset` event tells the UI to discard the partial draft;
+- the reader disconnects after receiving draft text: an audit record `chat_interrupted`
+  stores what was delivered, so nothing shown to a user is unaccounted for;
+- providers without native streaming (Claude here, test fakes) deliver the whole answer as
+  one `delta`, so every code path works with every provider;
+- `/chat` (blocking) is the same pipeline consumed to the end - used by evaluation, which
+  must not depend on timing - and shares the rate limit with `/chat/stream`.
+
 ### Governance gates the index
 Internal documents carry `owner`, `approved_by`, `approved_on`, `review_due` and `status` in their
 front matter. `governance.validate` runs at the start of every ingest and fails with *all*

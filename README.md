@@ -39,6 +39,9 @@ citation is *checked against the source text by code* before it is shown.
   settings. See [`docs/security.md`](docs/security.md) for the deployment checklist.
 - **Single sign-on** — OpenID Connect (authorization code + PKCE). Role and clearance come from
   the identity provider's groups, not from this app; Keycloak included for local try-out.
+- **Streaming answers** — real progress, the retrieved sources after about a second and the answer
+  text as it is written (labelled as an unverified draft); the verified answer, with citations
+  checked against the originals, replaces it at the end.
 - **Time-aware answers** — "what was the gift limit as of June 2024?" retrieves the policy
   version in force on that date; pending amendments (e.g. SEC ทธ. 53/2568 amending
   ทธ. 35/2556) are surfaced as warnings.
@@ -231,7 +234,7 @@ uv run copilot audit-verify
 uv run copilot add-policy my-policy.md --dry-run   # validate + preview a real policy before adding it
 uv run copilot check-updates          # has a regulator changed a pinned source? (read-only)
 uv run copilot governance             # reviews due, drafts, sample documents still in the corpus
-uv run pytest                         # 99 tests (integration tests need the DB)
+uv run pytest                         # 116 tests (integration tests need the DB)
 ```
 
 A scripted 4-minute demo walkthrough is in [`docs/demo-script.md`](docs/demo-script.md).
@@ -272,8 +275,7 @@ deliberately planted gaps for the gap-analysis demo.
 - SSO is tested against Keycloak and a fake provider; a real bank IdP (Entra ID, Okta) needs
   its group claim name checked, session logout (single logout) and token refresh. RLS covers
   document reads; user-owned tables (chat history, feedback) are still protected in the API only.
-- Production hardening: an on-prem LLM option for data residency, streaming responses,
-  scheduled re-ingestion when regulators publish amendments.
+- Production hardening: an on-prem LLM option for data residency, scheduled re-ingestion when regulators publish amendments.
 
 ## Project layout
 

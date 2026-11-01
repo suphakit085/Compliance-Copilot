@@ -10,6 +10,7 @@ passages (retrieval-only mode) instead of an unsupported answer.
 from __future__ import annotations
 
 import time
+from collections.abc import Generator
 from datetime import date
 from typing import Any, Literal
 
@@ -22,6 +23,7 @@ from ..guardrails.pii import mask_pii
 from ..retrieval.retriever import Candidate, RetrievalResult, UserContext, retrieve
 from . import prompts
 from .citations import ground
+from .streaming import AnswerStream
 
 Status = Literal[
     "answered", "partial", "insufficient_evidence", "out_of_scope", "blocked",
@@ -147,12 +149,74 @@ def answer_question(
     retrieval_overrides: dict[str, Any] | None = None,
     llm_purpose: str = "chat",
 ) -> ChatResponse:
+    """Blocking form: runs the event stream to the end and returns the final response."""
+    final: ChatResponse | None = None
+    for ev in stream_answer(question, user, history, as_of, log=log,
+                            retrieval_overrides=retrieval_overrides, llm_purpose=llm_purpose, stream=False):
+        if ev["type"] == "final":
+            final = ev["response"]
+    assert final is not None
+    return final
+
+
+def _generate(
+    standalone: str, sources: list[SourceOut], notices: list[str], as_of: str, purpose: str,
+    stream: bool, delivered: list[str],
+) -> Generator[dict[str, Any], None, tuple[prompts.GroundedAnswer, llm.Usage]]:
+    """Run the answer model. With ``stream`` the answer text is emitted as ``delta`` events
+    while it is written (an *unverified draft*); the caller replaces it with the verified
+    answer. Returns the parsed model output and token usage."""
+    s = get_settings()
+    provider = llm.get_provider(purpose)
+    prompt = prompts.answer_prompt(standalone, _prompt_sources(sources), notices, as_of)
+    if not stream:
+        return provider.generate_json(prompts.ANSWER_SYSTEM, prompt, prompts.GroundedAnswer, effort=s.answer_effort)
+    extractor, parts, usage = AnswerStream(), [], llm.Usage(model="")
+    for item in llm.stream_json(provider, prompts.ANSWER_SYSTEM, prompt, prompts.GroundedAnswer, s.answer_effort):
+        if isinstance(item, llm.Usage):
+            usage = item
+            continue
+        if isinstance(item, llm.StreamReset):  # the provider restarted: forget the partial draft
+            parts.clear()
+            extractor = AnswerStream()
+            delivered.append("\n[--- stream restarted ---]\n")
+            yield {"type": "reset"}
+            continue
+        parts.append(item)
+        if piece := extractor.feed(item):
+            delivered.append(piece)
+            yield {"type": "delta", "text": piece}
+    try:
+        return prompts.GroundedAnswer.model_validate_json("".join(parts)), usage
+    except ValueError as e:
+        raise llm.LLMError(f"Model returned invalid JSON for GroundedAnswer: {e}") from e
+
+
+def stream_answer(
+    question: str,
+    user: UserContext,
+    history: list[dict[str, str]] | None = None,
+    as_of: date | None = None,
+    *,
+    log: bool = True,
+    retrieval_overrides: dict[str, Any] | None = None,
+    llm_purpose: str = "chat",
+    stream: bool = True,
+) -> Generator[dict[str, Any], None, None]:
+    """The answer pipeline as a stream of events:
+
+    ``stage`` (guard | condense | retrieve | generate | verify), ``sources`` (retrieved, already
+    permission-filtered), ``delta`` (draft answer text, unverified) and finally ``final`` with
+    the verified ChatResponse. Only the final response is trustworthy; deltas are a preview.
+    """
     s = get_settings()
     started = time.perf_counter()
     as_of = as_of or date.today()
     trace: dict[str, Any] = {}
+    stream = stream and llm_purpose == "chat"
 
     # 1. Guardrails on raw input
+    yield {"type": "stage", "stage": "guard"}
     guard = input_guard.screen(question)
     masked = mask_pii(question) if s.pii_masking else mask_pii("")
     q = masked.text if s.pii_masking else question
@@ -164,12 +228,14 @@ def answer_question(
         )
         if log:
             resp.audit_id = audit.log_event("chat", _audit_payload(resp, q, None, None, 0), user)
-        return resp
+        yield {"type": "final", "response": resp}
+        return
 
     # 2. Follow-up questions are rewritten into standalone ones (on masked text only)
     standalone = q
     usage_total = llm.Usage(model="")
     if history and llm.available():
+        yield {"type": "stage", "stage": "condense"}
         hist = "\n".join(
             f"{m['role']}: {mask_pii(m['content']).text[:1500]}" for m in history[-6:]
         )
@@ -184,6 +250,7 @@ def answer_question(
             trace["condense_error"] = str(e)
 
     # 3. Retrieval (ACL + effective-date filtering happen inside the SQL)
+    yield {"type": "stage", "stage": "retrieve"}
     retrieval = retrieve(standalone, user, as_of, **(retrieval_overrides or {}))
     sources = [_source_out(i, c) for i, c in enumerate(retrieval.candidates, 1)]
     trace["retrieval"] = {"timings_ms": retrieval.timings_ms, "top_score": retrieval.top_score,
@@ -198,7 +265,11 @@ def answer_question(
     if retrieval.top_score < s.abstain_threshold:
         resp = ChatResponse(status="insufficient_evidence", answer=NO_EVIDENCE, **{**base, "sources": []},
                             trace={**trace, "abstained": True})
-        return _finish(resp, q, retrieval, None, started, user, log)
+        yield {"type": "final", "response": _finish(resp, q, retrieval, None, started, user, log)}
+        return
+
+    # The passages are already permission-filtered, so they can be shown while the answer is written.
+    yield {"type": "sources", "sources": [src.model_dump() for src in sources], "notices": retrieval.notices}
 
     # 5. Generation
     if not llm.available():
@@ -207,14 +278,24 @@ def answer_question(
             answer=_retrieval_only_answer(sources, "ระบบอยู่ในโหมดค้นคืนเท่านั้น (ยังไม่ได้ตั้งค่า LLM)"),
             **base, trace=trace,
         )
-        return _finish(resp, q, retrieval, None, started, user, log)
+        yield {"type": "final", "response": _finish(resp, q, retrieval, None, started, user, log)}
+        return
 
-    prompt = prompts.answer_prompt(standalone, _prompt_sources(sources), retrieval.notices, as_of.isoformat())
+    yield {"type": "stage", "stage": "generate"}
+    delivered: list[str] = []
     try:
-        gen, u = llm.get_provider(llm_purpose).generate_json(
-            prompts.ANSWER_SYSTEM, prompt, prompts.GroundedAnswer, effort=s.answer_effort
-        )
+        gen, u = yield from _generate(standalone, sources, retrieval.notices, as_of.isoformat(),
+                                      llm_purpose, stream, delivered)
         usage_total = _add(usage_total, u)
+    except GeneratorExit:
+        # The reader went away mid-answer. Text it already received must not be unaccounted for.
+        if log and delivered:
+            audit.log_event("chat_interrupted", {
+                "question_masked": q, "standalone_question": standalone, "as_of": as_of.isoformat(),
+                "draft_delivered_unverified": "".join(delivered),
+                "retrieved": [x.chunk_id for x in sources],
+            }, user)
+        raise
     except llm.QuotaExceeded:
         if llm_purpose == "batch":
             raise
@@ -223,16 +304,19 @@ def answer_question(
             answer=_retrieval_only_answer(sources, "โควตา LLM ของวันนี้หมดแล้ว ระบบจึงแสดงเฉพาะข้อความต้นฉบับ"),
             **base, trace={**trace, "llm_error": "quota exceeded"},
         )
-        return _finish(resp, q, retrieval, None, started, user, log)
+        yield {"type": "final", "response": _finish(resp, q, retrieval, None, started, user, log)}
+        return
     except llm.LLMError as e:
         resp = ChatResponse(
             status="retrieval_only",
             answer=_retrieval_only_answer(sources, "ไม่สามารถสร้างคำตอบได้ในขณะนี้"),
             **base, trace={**trace, "llm_error": str(e)},
         )
-        return _finish(resp, q, retrieval, None, started, user, log)
+        yield {"type": "final", "response": _finish(resp, q, retrieval, None, started, user, log)}
+        return
 
     # 6. Verify every quote against the source text
+    yield {"type": "stage", "stage": "verify"}
     report = ground(gen.answer, [(c.source_id, c.quote) for c in gen.citations],
                     {src.id: src.text for src in sources})
     for src in sources:
@@ -258,7 +342,7 @@ def answer_question(
         status=status, answer=answer, follow_up_questions=gen.follow_up_questions[:3],
         grounding=grounding, trace={**trace, "llm": usage_total.__dict__}, **base,
     )
-    return _finish(resp, q, retrieval, usage_total, started, user, log)
+    yield {"type": "final", "response": _finish(resp, q, retrieval, usage_total, started, user, log)}
 
 
 def _add(a: llm.Usage, b: llm.Usage) -> llm.Usage:

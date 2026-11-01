@@ -4,6 +4,7 @@ an untrusted client."""
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from contextlib import asynccontextmanager
 from datetime import date
@@ -12,7 +13,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
@@ -21,7 +22,7 @@ from .. import __version__, audit, governance, history, llm, sso
 from ..config import ROOT, get_settings
 from ..db import AuditLog, Chunk, Document, Feedback, as_reader, engine, init_db, session
 from ..features import gap_analysis
-from ..generation.answerer import ChatResponse, answer_question
+from ..generation.answerer import ChatResponse, answer_question, stream_answer
 from ..guardrails.pii import mask_pii
 from ..ingestion.updates import read_lock
 from ..ratelimit import limiter
@@ -245,17 +246,55 @@ class ChatIn(BaseModel):
     conversation_id: str | None = None
 
 
+def _turns(user: UserContext, body: ChatIn) -> list[dict[str, str]]:
+    """Follow-up context: from the server-side record when history is on, never trusted from the client."""
+    if not history.enabled():
+        return [t.model_dump() for t in body.history[-6:]]
+    return history.recent_turns(user, body.conversation_id) if body.conversation_id else []
+
+
+def _remember(user: UserContext, body: ChatIn, resp: ChatResponse) -> None:
+    if history.enabled():
+        masked = mask_pii(body.question).text
+        conv_id = history.get_or_create(user, body.conversation_id, masked)
+        history.append(conv_id, masked, resp.model_dump(mode="json"))
+        resp.conversation_id = conv_id
+
+
 @app.post("/chat", response_model=ChatResponse, tags=["chat"])
 def chat(body: ChatIn, user: Annotated[UserContext, Depends(limited("chat", "rate_chat_per_min", 60))]) -> ChatResponse:
-    if not history.enabled():
-        return answer_question(body.question, user, [t.model_dump() for t in body.history[-6:]], body.as_of)
-    # Follow-up context comes from the server-side record, not from the client.
-    turns = history.recent_turns(user, body.conversation_id) if body.conversation_id else []
-    resp = answer_question(body.question, user, turns, body.as_of)
-    conv_id = history.get_or_create(user, body.conversation_id, mask_pii(body.question).text)
-    history.append(conv_id, mask_pii(body.question).text, resp.model_dump(mode="json"))
-    resp.conversation_id = conv_id
+    resp = answer_question(body.question, user, _turns(user, body), body.as_of)
+    _remember(user, body, resp)
     return resp
+
+
+@app.post("/chat/stream", tags=["chat"])
+def chat_stream(
+    body: ChatIn, user: Annotated[UserContext, Depends(limited("chat", "rate_chat_per_min", 60))]
+) -> StreamingResponse:
+    """Same answer as /chat, delivered as newline-delimited JSON events.
+
+    ``stage`` and ``sources`` show real progress; ``delta`` is the answer text as it is
+    written and is an *unverified draft*; the ``final`` event carries the verified response
+    (citations checked against the source text) and replaces the draft.
+    """
+    turns = _turns(user, body)
+
+    def events():
+        try:
+            for ev in stream_answer(body.question, user, turns, body.as_of):
+                if ev["type"] == "final":
+                    _remember(user, body, ev["response"])
+                    ev = {"type": "final", "response": ev["response"].model_dump(mode="json")}
+                yield json.dumps(ev, ensure_ascii=False, default=str) + "\n"
+        except Exception:  # headers are already sent: report in-band, never leak details
+            logging.getLogger(__name__).exception("chat stream failed")
+            yield json.dumps({"type": "error", "message": "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่"}) + "\n"
+
+    return StreamingResponse(
+        events(), media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},  # no proxy buffering
+    )
 
 
 # ------------------------------------------------------------------------ history

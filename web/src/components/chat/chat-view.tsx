@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   ArrowUp, BookMarked, CalendarClock, Gift, HandCoins, Landmark, Loader2, RotateCcw, Scale, ShieldCheck,
 } from "lucide-react";
-import { api, type ChatResponse } from "@/lib/api";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { api, streamChat, type ChatResponse, type ChatStage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/components/app-shell";
 import { useToday } from "@/lib/use-today";
@@ -23,34 +25,50 @@ const EXAMPLES = [
   { icon: HandCoins, tag: "ธปท.", q: "ธนาคารจัดโปรแจกของรางวัลให้ลูกค้าทันทีที่สมัครสินเชื่อได้หรือไม่" },
 ];
 
+// Real pipeline stages, reported by the server as they start.
 const STEPS = [
   "ตรวจสอบคำถามและปิดบังข้อมูลส่วนบุคคล",
-  "ค้นหาในเอกสารที่คุณมีสิทธิ์เข้าถึง",
-  "จัดอันดับความเกี่ยวข้องด้วย cross-encoder",
+  "ค้นหาและจัดอันดับในเอกสารที่คุณมีสิทธิ์เข้าถึง",
   "สร้างคำตอบจากแหล่งอ้างอิง",
   "ตรวจสอบข้อความที่อ้างกับต้นฉบับ",
 ];
+const STAGE_STEP: Record<ChatStage, number> = { guard: 0, condense: 0, retrieve: 1, generate: 2, verify: 3 };
 
-function Thinking() {
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setI((x) => Math.min(x + 1, STEPS.length - 1)), 1400);
-    return () => clearInterval(t);
-  }, []);
+type Live = { stage: ChatStage; sources: ChatResponse["sources"]; draft: string };
+
+/** The answer while it is being produced: real progress, then the text as it is written. The
+ *  text is a draft - citations are only checked against the originals at the end. */
+function LiveAnswer({ live }: { live: Live }) {
+  const i = STAGE_STEP[live.stage];
+  const md = live.draft.replace(/\[S(\d+)\]/g, "`[S$1]`");
   return (
-    <div className="space-y-2.5 py-1">
-      {STEPS.map((s, k) => (
-        <div key={s} className={cn("flex items-center gap-2.5 text-sm transition-opacity duration-500", k > i ? "opacity-25" : "opacity-100")}>
-          {k < i ? (
-            <span className="flex size-4 items-center justify-center text-success">✓</span>
-          ) : k === i ? (
-            <Loader2 className="size-4 animate-spin text-brand" />
-          ) : (
-            <span className="size-4" />
-          )}
-          <span className={k === i ? "text-foreground" : "text-muted-foreground"}>{s}</span>
+    <div className="space-y-3">
+      {live.draft ? (
+        <>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {i >= 3 ? <ShieldCheck className="size-3.5 text-brand" /> : <Loader2 className="size-3.5 animate-spin text-brand" />}
+            {i >= 3 ? "กำลังตรวจสอบการอ้างอิงกับต้นฉบับ…" : "ร่างคำตอบ — ยังไม่ได้ตรวจสอบการอ้างอิง"}
+          </div>
+          <div className="answer-prose opacity-80">
+            <Markdown remarkPlugins={[remarkGfm]}>{md}</Markdown>
+          </div>
+        </>
+      ) : (
+        <div className="space-y-2.5 py-1">
+          {STEPS.map((s, k) => (
+            <div key={s} className={cn("flex items-center gap-2.5 text-sm transition-opacity duration-500", k > i ? "opacity-25" : "opacity-100")}>
+              {k < i ? (
+                <span className="flex size-4 items-center justify-center text-success">✓</span>
+              ) : k === i ? (
+                <Loader2 className="size-4 animate-spin text-brand" />
+              ) : (
+                <span className="size-4" />
+              )}
+              <span className={k === i ? "text-foreground" : "text-muted-foreground"}>{s}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -128,6 +146,8 @@ export function ChatView({ conversationId }: { conversationId?: string }) {
   const [asOfChoice, setAsOf] = useState<string | null>(null);
   const asOf = asOfChoice ?? today;
   const [loading, setLoading] = useState(false);
+  const [live, setLive] = useState<Live | null>(null);
+  const abort = useRef<AbortController | null>(null);
   const [selected, setSelected] = useState<{ msg: number; source: string | null } | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -138,10 +158,15 @@ export function ChatView({ conversationId }: { conversationId?: string }) {
   const panelEntry = panelMsg !== undefined ? messages[panelMsg] : undefined;
   const panel = panelEntry?.role === "assistant" ? panelEntry.response : undefined;
 
+  const draftBucket = Math.floor((live?.draft.length ?? 0) / 120); // scroll as the draft grows, not per token
+  const liveStage = live?.stage;
   useEffect(() => {
     // scrollIntoView() returns a Promise in recent browsers - an effect must not return it
     bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, loading]);
+  }, [messages.length, loading, liveStage, draftBucket]);
+
+  // Leaving the page mid-answer closes the stream; the server records the interrupted draft.
+  useEffect(() => () => abort.current?.abort(), []);
 
   // Open a saved conversation (the server re-checks access to every cited source).
   useEffect(() => {
@@ -161,10 +186,25 @@ export function ChatView({ conversationId }: { conversationId?: string }) {
     setMessages(next);
     setInput("");
     setLoading(true);
+    setLive({ stage: "guard", sources: [], draft: "" });
+    setSelected(null);
+    abort.current = new AbortController();
     try {
-      const r = await api<ChatResponse>("/chat", {
-        body: { question, history, as_of: asOf || undefined, conversation_id: conversationId },
-      });
+      const got: { r: ChatResponse | null } = { r: null }; // filled by the stream callback
+      await streamChat(
+        { question, history, as_of: asOf || undefined, conversation_id: conversationId },
+        (ev) => {
+          if (ev.type === "stage") setLive((l) => l && { ...l, stage: ev.stage });
+          else if (ev.type === "sources") setLive((l) => l && { ...l, sources: ev.sources });
+          else if (ev.type === "delta") setLive((l) => l && { ...l, draft: l.draft + ev.text });
+          else if (ev.type === "reset") setLive((l) => l && { ...l, draft: "" });
+          else if (ev.type === "final") got.r = ev.response;
+          else if (ev.type === "error") throw new Error(ev.message);
+        },
+        abort.current.signal,
+      );
+      const r = got.r;
+      if (!r) throw new Error("การเชื่อมต่อขัดข้องก่อนได้คำตอบ กรุณาลองใหม่");
       const all: Msg[] = [...next, { role: "assistant", content: r.answer, response: r }];
       setMessages(all);
       setSelected(null);
@@ -184,6 +224,7 @@ export function ChatView({ conversationId }: { conversationId?: string }) {
       }]);
     } finally {
       setLoading(false);
+      setLive(null);
     }
   }
 
@@ -198,6 +239,12 @@ export function ChatView({ conversationId }: { conversationId?: string }) {
   }
 
   function renderSources(prefix: "panel" | "sheet") {
+    if (live?.sources.length) {
+      // while the answer is being written: show what it is being written from
+      return live.sources.map((s) => (
+        <SourceCard key={s.id} source={s} active={false} onSelect={() => {}} />
+      ));
+    }
     if (!panel) {
       return (
         <div className="px-4 pt-16 text-center">
@@ -231,7 +278,9 @@ export function ChatView({ conversationId }: { conversationId?: string }) {
   const sourcesHeader = (
     <>
       <BookMarked className="size-4 text-brand" /> แหล่งอ้างอิง
-      {panel && (
+      {live?.sources.length ? (
+        <span className="text-xs font-normal text-muted-foreground">· พบ {live.sources.length} รายการ กำลังตรวจสอบ</span>
+      ) : panel && (
         <span className="text-xs font-normal text-muted-foreground">
           · ใช้ตอบ {panel.sources.filter((s) => s.cited).length} จาก {panel.sources.length}
         </span>
@@ -343,7 +392,7 @@ export function ChatView({ conversationId }: { conversationId?: string }) {
                     <div className="hidden size-8 shrink-0 items-center justify-center rounded-[9px] bg-foreground text-background sm:flex">
                       <Scale className="size-4" />
                     </div>
-                    <div className="panel flex-1 p-4 sm:p-5"><Thinking /></div>
+                    <div className="panel min-w-0 flex-1 p-4 sm:p-5">{live && <LiveAnswer live={live} />}</div>
                   </div>
                 )}
                 <div ref={bottom} />
