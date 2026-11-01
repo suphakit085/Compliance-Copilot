@@ -31,6 +31,11 @@ citation is *checked against the source text by code* before it is shown.
 - **Permission-aware retrieval** — document classification and department scoping are
   enforced in the *same SQL query* as the vector search, so restricted text never reaches
   the prompt, the answer or the logs.
+- **Defence in depth** — the same permission rule is enforced twice: in the retrieval SQL and
+  again by Postgres row-level security under a read-only role, so a query that forgets the
+  filter still cannot return restricted text (tested by deleting the filter).
+- **Single sign-on** — OpenID Connect (authorization code + PKCE). Role and clearance come from
+  the identity provider's groups, not from this app; Keycloak included for local try-out.
 - **Time-aware answers** — "what was the gift limit as of June 2024?" retrieves the policy
   version in force on that date; pending amendments (e.g. SEC ทธ. 53/2568 amending
   ทธ. 35/2556) are surfaced as warnings.
@@ -194,6 +199,17 @@ uv run uvicorn compliance_copilot.api.main:app --port 8000
 cd web && npm install && npm run dev    # http://localhost:3000
 ```
 
+Optional SSO try-out with a local Keycloak (test users `sso.employee` / `sso.compliance` /
+`sso.nogroup`, password `demo-sso`, defined in [`config/keycloak/`](config/keycloak/copilot-realm.json)):
+
+```bash
+docker compose --profile sso up -d keycloak     # http://localhost:8081
+# then uncomment the COPILOT_OIDC_* lines in .env and restart the API
+```
+
+The login page shows an SSO button only when `COPILOT_OIDC_ISSUER` is set. Group → role
+mapping is in [`config/sso.yaml`](config/sso.yaml).
+
 Demo accounts are in [`config/users.yaml`](config/users.yaml) (employee, compliance
 officer, internal auditor, admin) — try the same question as `somchai` and `nida` to see
 access control in action.
@@ -206,7 +222,7 @@ uv run copilot gap pol-pdpa-001 --out gap.md
 uv run copilot eval --no-e2e          # retrieval ablation only (no LLM calls)
 uv run copilot eval --set holdout     # held-out set
 uv run copilot audit-verify
-uv run pytest                         # 63 tests (integration tests need the DB)
+uv run pytest                         # 73 tests (integration tests need the DB)
 ```
 
 A scripted 4-minute demo walkthrough is in [`docs/demo-script.md`](docs/demo-script.md).
@@ -239,8 +255,10 @@ deliberately planted gaps for the gap-analysis demo.
   so interrupted runs resume).
 - Vocabulary gaps between how staff ask and how statutes are worded are handled by a
   curated glossary (`data/glossary.yaml`); it needs an owner and a review process.
-- Production hardening: SSO/OIDC instead of demo passwords, Postgres row-level security as
-  a second ACL layer, an on-prem LLM option for data residency, streaming responses,
+- SSO is tested against Keycloak and a fake provider; a real bank IdP (Entra ID, Okta) needs
+  its group claim name checked, session logout (single logout) and token refresh. RLS covers
+  document reads; user-owned tables (chat history, feedback) are still protected in the API only.
+- Production hardening: an on-prem LLM option for data residency, streaming responses,
   scheduled re-ingestion when regulators publish amendments.
 
 ## Project layout
