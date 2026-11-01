@@ -40,6 +40,7 @@ class UserContext:
     department: str
     clearance: int
     display_name: str = ""
+    terms_ok: bool = True  # has accepted the current acceptable-use terms (or none are required)
 
 
 @dataclass

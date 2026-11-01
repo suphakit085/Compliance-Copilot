@@ -46,6 +46,7 @@ services:
       COPILOT_LOG_FORMAT: json
       COPILOT_TRUST_PROXY: "true"          # the web tier forwards the visitor's address
       COPILOT_PASSWORD_LOGIN: ${COPILOT_PASSWORD_LOGIN:-true}
+      COPILOT_TERMS_REQUIRED: "true"           # users accept config/terms.th.md before asking questions
       COPILOT_DEVICE: ${COPILOT_DEVICE:-auto}
       COPILOT_ALLOWED_HOSTS: ${COPILOT_ALLOWED_HOSTS:-}
       COPILOT_OIDC_ISSUER: ${COPILOT_OIDC_ISSUER:-}

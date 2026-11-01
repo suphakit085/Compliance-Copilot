@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     pii_masking: bool = True
     # Password login can be switched off once SSO is the only way in.
     password_login: bool = True
+    # Require every user to accept the acceptable-use terms (config/terms.th.md) before asking questions.
+    terms_required: bool = False
     # Lock an account for a while after repeated wrong passwords (an unknown username is
     # counted the same way, so the response never reveals whether an account exists).
     login_max_failures: int = 5

@@ -16,7 +16,7 @@ import jwt
 import yaml
 from sqlalchemy import select
 
-from . import ratelimit
+from . import ratelimit, terms
 from .config import ROOT, get_settings
 from .db import CLEARANCE, User, init_db, session
 from .retrieval.retriever import UserContext
@@ -87,7 +87,8 @@ def create_user(username: str, display_name: str, role: str, department: str, cl
 
 
 def to_context(u: User) -> UserContext:
-    return UserContext(u.id, u.username, u.role, u.department, u.clearance, u.display_name)
+    return UserContext(u.id, u.username, u.role, u.department, u.clearance, u.display_name,
+                       terms_ok=terms.accepted(u.terms_version))
 
 
 class LoginLocked(Exception):
@@ -135,6 +136,15 @@ def authenticate(username: str, password: str) -> UserContext | None:
         return None
 
 
+def demo_accounts_with_published_passwords() -> list[str]:
+    """Active accounts whose password is still one published in config/users.yaml."""
+    data = yaml.safe_load((ROOT / "config" / "users.yaml").read_text(encoding="utf-8"))
+    known = {u["username"]: u["password"] for u in data["users"]}
+    with session() as db:
+        return [u.username for u in db.execute(select(User).where(User.active.is_(True))).scalars()
+                if u.username in known and check_password(known[u.username], u.password_hash)]
+
+
 def check_production_ready() -> None:
     """Refuse to start in production with settings that are only acceptable on a laptop."""
     s = get_settings()
@@ -144,12 +154,7 @@ def check_production_ready() -> None:
     if s.jwt_secret == "dev-only-change-me" or len(s.jwt_secret) < 32:
         problems.append("COPILOT_JWT_SECRET must be a random value of at least 32 characters")
     if s.password_login:
-        data = yaml.safe_load((ROOT / "config" / "users.yaml").read_text(encoding="utf-8"))
-        known = {u["username"]: u["password"] for u in data["users"]}
-        with session() as db:
-            for u in db.execute(select(User).where(User.active.is_(True))).scalars():
-                if u.username in known and check_password(known[u.username], u.password_hash):
-                    problems.append(f"demo account '{u.username}' still has its published password")
+        problems += [f"demo account '{u}' still has its published password" for u in demo_accounts_with_published_passwords()]
     if problems:
         raise RuntimeError("unsafe production configuration:\n  - " + "\n  - ".join(problems))
 
