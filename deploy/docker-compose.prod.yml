@@ -1,0 +1,113 @@
+# Production-shaped stack: database, API, web (and optional monitoring).
+#
+#   deploy/make-secrets.sh                                   # once: random secrets into deploy/secrets/
+#   docker compose -f deploy/docker-compose.prod.yml up -d
+#   docker compose -f deploy/docker-compose.prod.yml exec api copilot create-user admin   # first admin
+#   docker compose -f deploy/docker-compose.prod.yml exec api copilot fetch && ... exec api copilot ingest
+#   docker compose -f deploy/docker-compose.prod.yml --profile monitoring up -d prometheus
+#
+# Only the web tier is published. The API and the database are reachable only inside the stack;
+# the database network has no route to the internet. Put TLS (a reverse proxy / ingress) in front of
+# the web port. Secrets are files, never environment variables or image layers.
+
+name: ${COPILOT_PROJECT:-compliance-copilot}
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+
+services:
+  db:
+    <<: *hardening
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: copilot
+      POSTGRES_DB: copilot
+      POSTGRES_PASSWORD_FILE: /run/secrets/copilot_db_password
+    secrets: [copilot_db_password]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copilot -d copilot"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    # postgres needs these three to start as its own user and own its data directory
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+
+  api:
+    <<: *hardening
+    image: ${COPILOT_API_IMAGE:-compliance-copilot-api}
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      COPILOT_ENV: production
+      COPILOT_LOG_FORMAT: json
+      COPILOT_TRUST_PROXY: "true"          # the web tier forwards the visitor's address
+      COPILOT_PASSWORD_LOGIN: ${COPILOT_PASSWORD_LOGIN:-true}
+      COPILOT_DEVICE: ${COPILOT_DEVICE:-auto}
+      COPILOT_ALLOWED_HOSTS: ${COPILOT_ALLOWED_HOSTS:-}
+      COPILOT_OIDC_ISSUER: ${COPILOT_OIDC_ISSUER:-}
+      COPILOT_OIDC_CLIENT_ID: ${COPILOT_OIDC_CLIENT_ID:-}
+      COPILOT_OIDC_REDIRECT_URI: ${COPILOT_OIDC_REDIRECT_URI:-http://localhost:3000/api/auth/sso/callback}
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}  # set to 1 once the models are in the volume
+      HOME: /tmp
+    secrets: [copilot_jwt_secret, copilot_database_url, copilot_metrics_token, copilot_gemini_api_key]
+    volumes:
+      - models:/models
+      - corpus_raw:/app/data/raw
+      - corpus_cache:/app/data/processed
+    networks: [app, data]
+    read_only: true
+    tmpfs: [/tmp]
+    deploy:
+      resources:
+        limits: {memory: 10g}
+    # GPU (optional): build the image with the CUDA torch index and uncomment
+    #   deploy.resources.reservations.devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
+
+  web:
+    <<: *hardening
+    image: ${COPILOT_WEB_IMAGE:-compliance-copilot-web}
+    depends_on: [api]
+    environment:
+      COPILOT_API_URL: http://api:8000
+    ports: ["${COPILOT_WEB_PORT:-3000}:3000"]
+    networks: [app]
+    read_only: true
+    tmpfs: [/tmp, "/app/.next/cache"]
+    deploy:
+      resources:
+        limits: {memory: 512m}
+
+  prometheus:
+    <<: *hardening
+    profiles: [monitoring]
+    image: prom/prometheus:v3.5.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=30d"]
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    secrets: [copilot_metrics_token]
+    networks: [app]
+    ports: ["127.0.0.1:9090:9090"]      # operators only
+
+networks:
+  app: {}
+  data:
+    internal: true                      # no route to the internet
+
+volumes:
+  pgdata: {}
+  models: {}
+  corpus_raw: {}
+  corpus_cache: {}
+  prometheus_data: {}
+
+secrets:
+  copilot_db_password: {file: ./secrets/copilot_db_password}
+  copilot_jwt_secret: {file: ./secrets/copilot_jwt_secret}
+  copilot_database_url: {file: ./secrets/copilot_database_url}
+  copilot_metrics_token: {file: ./secrets/copilot_metrics_token}
+  copilot_gemini_api_key: {file: ./secrets/copilot_gemini_api_key}

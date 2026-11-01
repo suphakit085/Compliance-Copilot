@@ -1,0 +1,86 @@
+# Every push and pull request: lint, unit tests, web build, container builds.
+# Tests that need Postgres + the ingested corpus + the retrieval models skip themselves here;
+# they run in integration.yml.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python - lint and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.13"
+          python-version: "3.12"
+      - name: Install dependencies (CPU PyTorch)
+        # The lock pins CUDA wheels; CI installs the CPU build first so nothing pulls 3 GB of CUDA.
+        run: |
+          uv venv
+          uv pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.6"
+          uv export --frozen --no-hashes --no-emit-project \
+            | grep -Ev '^(torch|nvidia-|cuda-|triton|pytorch-triton)' > requirements.txt
+          uv pip install -r requirements.txt
+          uv pip install --no-deps -e .
+      - name: Ruff
+        run: .venv/bin/ruff check src tests
+      - name: Unit tests
+        env:
+          COPILOT_DATABASE_URL: postgresql+psycopg://none:none@127.0.0.1:1/none  # no DB: integration tests skip
+        run: .venv/bin/pytest -q -rs
+
+  web:
+    name: Web - types, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24          # the lockfile is written by npm 11; npm 10 (Node 22) rejects it
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx eslint
+      - run: npm run build
+
+  images:
+    name: Container images build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: API image (CPU)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: compliance-copilot-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - name: Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: web
+          push: false
+          tags: compliance-copilot-web:ci
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web

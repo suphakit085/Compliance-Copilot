@@ -1,0 +1,81 @@
+# Full stack against a real Postgres + pgvector: ingest the corpus, run every test, and gate on
+# retrieval quality. Needs no LLM key: tests use a scripted fake model, and the retrieval
+# evaluation is deterministic. Slow on CPU runners (model download + embedding), so it runs on
+# main, weekly and on demand rather than on every pull request.
+name: Integration
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 2 * * 1"   # Monday 02:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: copilot
+          POSTGRES_PASSWORD: copilot
+          POSTGRES_DB: copilot
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U copilot -d copilot"
+          --health-interval 5s --health-timeout 3s --health-retries 30
+    env:
+      COPILOT_DATABASE_URL: postgresql+psycopg://copilot:copilot@localhost:5433/copilot
+      COPILOT_DEVICE: cpu
+      HF_HOME: ${{ github.workspace }}/.hf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.13"
+          python-version: "3.12"
+      - name: Install dependencies (CPU PyTorch)
+        run: |
+          uv venv
+          uv pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.6"
+          uv export --frozen --no-hashes --no-emit-project \
+            | grep -Ev '^(torch|nvidia-|cuda-|triton|pytorch-triton)' > requirements.txt
+          uv pip install -r requirements.txt
+          uv pip install --no-deps -e .
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Cache retrieval models
+        uses: actions/cache@v4
+        with:
+          path: .hf
+          key: hf-bge-m3-reranker-v2-m3-v1
+      - name: Cache regulation PDFs
+        uses: actions/cache@v4
+        with:
+          path: data/raw/*.pdf
+          key: corpus-${{ hashFiles('data/sources.yaml', 'data/raw/manifest.lock.json') }}
+      - name: Fetch, verify and ingest the corpus
+        # OCR of scanned pages is committed (data/processed/ocr), so ingestion needs no LLM.
+        run: |
+          copilot fetch
+          git diff --exit-code data/raw/manifest.lock.json || { echo "::error::a source PDF changed at the publisher - review before trusting results"; exit 1; }
+          copilot seed-users
+          copilot ingest
+      - name: All tests
+        run: pytest -q -rs
+      - name: Retrieval quality gate (main and held-out sets)
+        run: |
+          copilot eval --no-e2e --min-hit6 0.95
+          copilot eval --no-e2e --set holdout --min-hit6 0.90
+      - name: Keep the evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: |
+            docs/eval-report*.md
+            eval/results/latest*.json

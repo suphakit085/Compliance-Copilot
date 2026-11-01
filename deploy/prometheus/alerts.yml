@@ -1,0 +1,102 @@
+groups:
+  - name: copilot-availability
+    rules:
+      - alert: CopilotApiDown
+        expr: up{job="compliance-copilot-api"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Compliance Copilot API is not answering scrapes"
+
+      - alert: CopilotServerErrors
+        expr: |
+          sum(rate(copilot_http_requests_total{status=~"5.."}[10m]))
+            / clamp_min(sum(rate(copilot_http_requests_total[10m])), 0.001) > 0.02
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 2% of API requests fail with 5xx"
+
+      - alert: CopilotSlowAnswers
+        expr: histogram_quantile(0.95, sum(rate(copilot_chat_latency_seconds_bucket[15m])) by (le)) > 30
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "p95 time to a verified answer is above 30 s"
+
+  - name: copilot-trust
+    # These are the alerts that matter most for a compliance assistant: it can be "up" and still
+    # be giving answers nobody should rely on.
+    rules:
+      - alert: AuditChainBroken
+        expr: copilot_audit_chain_valid == 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Audit log hash chain failed verification - a record was altered or deleted"
+          description: "Treat as a security incident. Run `copilot audit-verify` to find the first broken id."
+
+      - alert: AuditChainNotVerified
+        expr: time() - copilot_audit_chain_checked_timestamp_seconds > 7200
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "The audit chain has not been verified for over 2 hours (watchdog stopped?)"
+
+      - alert: CitationVerificationLow
+        expr: |
+          sum(increase(copilot_citations_verified_total[1h]))
+            / clamp_min(sum(increase(copilot_citations_total[1h])), 1) < 0.9
+          and sum(increase(copilot_citations_total[1h])) > 20
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "Under 90% of cited quotes were found in the source text (baseline ~97%)"
+          description: "Model or prompt change, or ingestion damage. Compare with the evaluation report."
+
+      - alert: UnverifiedAnswersHigh
+        expr: |
+          sum(increase(copilot_chat_total{status="unverified"}[1h]))
+            / clamp_min(sum(increase(copilot_chat_total[1h])), 1) > 0.05
+          and sum(increase(copilot_chat_total[1h])) > 20
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 5% of answers could not be verified against their sources"
+
+      - alert: AbstentionRateHigh
+        expr: |
+          sum(increase(copilot_chat_total{status="insufficient_evidence"}[6h]))
+            / clamp_min(sum(increase(copilot_chat_total[6h])), 1) > 0.4
+          and sum(increase(copilot_chat_total[6h])) > 30
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "Over 40% of questions get no answer - missing documents, or retrieval is broken"
+
+      - alert: LlmDegraded
+        expr: sum(increase(copilot_llm_errors_total[10m])) > 0
+        for: 20m
+        labels: {severity: warning}
+        annotations:
+          summary: "The LLM keeps failing; users are getting source text instead of answers"
+          description: "Check provider quota (kind=quota) or availability (kind=error)."
+
+      - alert: StreamsRestartingOften
+        expr: sum(increase(copilot_stream_resets_total[1h])) > 20
+        labels: {severity: info}
+        annotations:
+          summary: "The LLM provider keeps dropping streams (503 high demand); answers are slower"
+
+  - name: copilot-security
+    rules:
+      - alert: PasswordGuessingSuspected
+        expr: sum(increase(copilot_login_failures_total[10m])) > 30
+        labels: {severity: warning}
+        annotations:
+          summary: "Many failed or locked logins in 10 minutes"
+
+      - alert: RateLimitSpike
+        expr: sum(increase(copilot_rate_limited_total[10m])) > 50
+        labels: {severity: info}
+        annotations:
+          summary: "Many requests refused by rate limits - a script, or limits set too low"

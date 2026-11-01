@@ -1,0 +1,56 @@
+# Weekly hygiene that does not depend on a code change:
+#  - has a regulator changed a pinned source document?
+#  - do the dependencies have newly published vulnerabilities?
+name: Weekly checks
+
+on:
+  schedule:
+    - cron: "0 1 * * 1"   # Monday 01:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sources:
+    name: Regulation sources unchanged
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.13"
+          python-version: "3.12"
+      - name: Install dependencies (CPU PyTorch)
+        run: |
+          uv venv
+          uv pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.6"
+          uv export --frozen --no-dev --no-hashes --no-emit-project \
+            | grep -Ev '^(torch|nvidia-|cuda-|triton|pytorch-triton)' > requirements.txt
+          uv pip install -r requirements.txt
+          uv pip install --no-deps -e .
+      - name: Compare with the publishers (exit 1 = a document changed; review it)
+        run: .venv/bin/copilot check-updates
+
+  dependencies:
+    name: Dependency vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.13"
+      - name: Python (pip-audit; PyTorch/CUDA wheels come from their own index and are tracked separately)
+        run: |
+          uv export --frozen --no-dev --no-hashes --no-emit-project \
+            | grep -Ev '^(torch|nvidia-|cuda-|triton|pytorch-triton)' > requirements.txt
+          uvx pip-audit -r requirements.txt --no-deps --disable-pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Web (production dependencies, high severity and above)
+        # Known moderate/low findings in the shadcn CLI toolchain are accepted - see docs/security.md
+        working-directory: web
+        run: npm audit --omit=dev --audit-level=high

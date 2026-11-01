@@ -17,3 +17,8 @@ data/processed/*
 
 # Eval: keep the latest results, not every run
 eval/results/eval-*.json
+
+# Deployment: generated secrets and local backups never go into git
+deploy/secrets/*
+!deploy/secrets/.gitkeep
+backups/
