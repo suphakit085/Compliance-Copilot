@@ -8,6 +8,19 @@ citation is *checked against the source text by code* before it is shown.
 > In compliance, "probably right" is not good enough. The system is designed around one
 > rule: **no verifiable evidence → no answer.**
 
+![Grounded answer with verified, highlighted citations](docs/images/chat-answer.png)
+
+<table>
+  <tr>
+    <td><img src="docs/images/gap-analysis.png" alt="Policy gap analysis"/></td>
+    <td><img src="docs/images/evaluation.png" alt="Evaluation dashboard"/></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/audit.png" alt="Hash-chained audit trail"/></td>
+    <td><img src="docs/images/login.png" alt="Login"/></td>
+  </tr>
+</table>
+
 ---
 
 ## What it does
@@ -31,8 +44,8 @@ citation is *checked against the source text by code* before it is shown.
   hash chain; editing any historical row is detectable.
 - **Policy Gap Analysis** — checks each clause of an internal policy against the
   regulations in force and produces a reviewable worklist with verified citations.
-- **Evaluation harness** — 51-question golden set, deterministic metrics, retrieval
-  ablation, threshold calibration.
+- **Evaluation harness** — 51-question golden set plus a 21-question held-out set,
+  deterministic metrics, retrieval ablation, threshold calibration.
 
 ## Results
 
@@ -48,13 +61,15 @@ Retrieval ablation on the golden set (answerable questions, top-6 context, RTX 4
 | **F. E + glossary expansion + comparison lookup (production)** | **0.85** | **1.000** | **1.000** | **0.900** | **0** |
 
 - Chunking by legal unit (มาตรา/ข้อ) instead of fixed windows is the single biggest win.
-- The reranker separates in-corpus from out-of-corpus questions cleanly (lowest answerable
-  question 0.24 vs highest out-of-corpus 0.008), so the abstention threshold (0.15)
-  makes no mistakes on this set.
 - Confidential-document leakage is 0 in every configuration.
 - The glossary (F) closes a vocabulary gap the eval exposed: users say "ข้อมูลอ่อนไหว" but
-  PDPA มาตรา 26 never uses that word. Because the fix was informed by this set, F's last
-  points should be confirmed on held-out questions.
+  PDPA มาตรา 26 never uses that word. Because the fix was informed by this set, it was then
+  checked on held-out questions (below).
+- Abstention is two-layered: a low reranker threshold (0.02) skips the LLM only when
+  nothing in the corpus is remotely relevant, and the LLM must return "insufficient
+  evidence" when the retrieved passages do not answer the question. The held-out set showed
+  that colloquial questions can score low ("กระเช้าปีใหม่" scored 0.04 against the gift
+  policy), so a high threshold (the earlier 0.15) wrongly refused answerable questions.
 
 End-to-end on all 51 questions with Gemini 3.1 Flash Lite:
 
@@ -66,12 +81,43 @@ End-to-end on all 51 questions with Gemini 3.1 Flash Lite:
 | Gold evidence cited (citation recall) | 98.8% |
 | Confidential-document leakage | **0** |
 | PII masked before the LLM | 100% |
-| Latency p50 / p95 | 3.5 s / 8.8 s |
+| Latency p50 / p95 (uncached LLM calls) | 3.5 s / 8.8 s |
 
 The first full run scored 96% and exposed two real defects, both fixed with regression
 tests: the injection filter blocked a legitimate question containing "ยกเลิกกฎกระทรวง"
 (legal wording), and a "does our policy comply with the law?" question retrieved only the
 policy. Comparison questions now also look up the regulation governing the policy clause.
+
+### Held-out set — checking for overfitting
+
+After tuning on the golden set, 21 new questions were written in the way staff actually
+ask (colloquial, situation-based: "ลูกค้าส่งกระเช้าปีใหม่มาให้ 4,000 บาท รับได้ไหม") and run
+**once, blind**, with no code changes:
+
+| Metric | Blind run | After fixes (no longer blind) |
+|---|---|---|
+| Retrieval Hit@6 (production config) | 94.1% | 100% |
+| Correct behaviour | 85.7% | 100% |
+| Key facts correct | 76.5% | 100% |
+| Gold evidence cited | 76.5% | 100% |
+| Cited quotes verified | 97.6% | 98.0% |
+| Confidential-document leakage | 0 | 0 |
+
+The blind run found three real defects, each now covered by a regression test:
+
+1. **Policy answered instead of the law** — asked whether a 45-day policy deadline is
+   lawful, the system quoted the policy but never retrieved PDPA มาตรา 30 (30 days).
+   When the top results are internal policy and no *relevant* regulation is among them, the
+   retriever now looks up the regulation governing that policy clause.
+2. **Over-cautious abstention** — colloquial questions scored below the 0.15 threshold and
+   were refused although the answer was in the corpus; the threshold is now 0.02 (see above).
+3. **PII miss** — "คุณสมศรี มีสุข" was not masked; names after the title "คุณ" are now masked
+   when followed by a surname (without masking ordinary words such as "คุณสมบัติ").
+
+The blind numbers are the honest estimate of performance on unseen questions; the
+after-fix column is not, since the fixes were informed by this set. Reports:
+[`docs/eval-report-holdout-blind.md`](docs/eval-report-holdout-blind.md),
+[`docs/eval-report-holdout.md`](docs/eval-report-holdout.md).
 
 Policy Gap Analysis on the synthetic PDPA policy found both planted conflicts (breach
 notification "7 days" vs 72 hours in มาตรา 37(4); access requests "45 days" vs 30 days in
@@ -158,9 +204,13 @@ Useful commands:
 uv run copilot ask "ต้องเก็บข้อมูล CDD กี่ปีหลังปิดบัญชี" --user somchai
 uv run copilot gap pol-pdpa-001 --out gap.md
 uv run copilot eval --no-e2e          # retrieval ablation only (no LLM calls)
+uv run copilot eval --set holdout     # held-out set
 uv run copilot audit-verify
-uv run pytest                         # 52 tests (integration tests need the DB)
+uv run pytest                         # 63 tests (integration tests need the DB)
 ```
+
+A scripted 4-minute demo walkthrough is in [`docs/demo-script.md`](docs/demo-script.md).
+The UI also works on phones (sidebar becomes a drawer, sources open as a bottom sheet).
 
 ## Corpus
 
@@ -182,8 +232,9 @@ deliberately planted gaps for the gap-analysis demo.
 
 ## Limitations & next steps
 
-- Gold set is 51 questions written by one person; a production rollout needs questions
-  sampled from real compliance queries and reviewed by the compliance team.
+- Gold and held-out sets (72 questions) were written by one person; a production rollout
+  needs questions sampled from real compliance queries and reviewed by the compliance team,
+  and a fresh blind set after every round of fixes.
 - End-to-end metrics depend on LLM quota; run `uv run copilot eval` (results are cached
   so interrupted runs resume).
 - Vocabulary gaps between how staff ask and how statutes are worded are handled by a
@@ -205,6 +256,6 @@ src/compliance_copilot/
   audit.py · security.py · evaluation.py · llm.py · cli.py
 web/           Next.js + shadcn/ui frontend (BFF proxy, chat, documents, gap, audit, eval)
 data/          sources.yaml (manifest) · internal/ (synthetic policies)
-eval/          golden_set.yaml · results/
+eval/          golden_set.yaml · holdout_set.yaml · results/
 tests/         unit + integration tests
 ```

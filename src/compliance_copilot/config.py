@@ -29,9 +29,14 @@ class Settings(BaseSettings):
     rrf_k: int = 60
     rerank_candidates: int = 24
     context_top_n: int = 6
-    # Below this reranker score (sigmoid, 0..1) the best evidence is too weak to answer
-    # from; the assistant abstains instead. Calibrated on the eval set (see eval/).
-    abstain_threshold: float = 0.15
+    # Below this reranker score (sigmoid, 0..1) the evidence is clearly irrelevant and the
+    # assistant abstains without calling the LLM. Kept just above the highest out-of-corpus
+    # score on the main set (0.008): colloquial questions about real policies can score as
+    # low as ~0.04 (held-out set), and in that grey zone the LLM itself reports
+    # "insufficient_evidence" when the passages do not answer the question.
+    abstain_threshold: float = 0.02
+    # Minimum score for pairing a policy clause with the regulation that governs it.
+    policy_pairing_threshold: float = 0.3
     chunk_max_chars: int = 1400
 
     # LLM. Keys use the COPILOT_ prefix so they never collide with other tools' env vars.

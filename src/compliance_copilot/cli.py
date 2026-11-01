@@ -113,6 +113,7 @@ def evaluate(
     e2e: Annotated[bool, typer.Option("--e2e/--no-e2e", help="End-to-end eval (uses the LLM)")] = True,
     limit: int | None = None,
     fresh: Annotated[bool, typer.Option("--fresh", help="Re-evaluate questions already done")] = False,
+    eval_set: Annotated[str, typer.Option("--set", help="main | holdout")] = "main",
 ) -> None:
     """Run the golden-set evaluation and write eval/results + docs/eval-report.md.
 
@@ -120,13 +121,13 @@ def evaluate(
     questions not evaluated yet."""
     from .evaluation import run
 
-    out = run(retrieval=retrieval, end_to_end=e2e, limit=limit, log=console.print, resume=not fresh)
+    out = run(retrieval=retrieval, end_to_end=e2e, limit=limit, log=console.print, resume=not fresh, eval_set=eval_set)
     if out.get("end_to_end"):
         e = out["end_to_end"]
         console.print_json(json.dumps(e["summary"], ensure_ascii=False))
         if e.get("remaining"):
             console.print(f"[yellow]{len(e['remaining'])} questions not evaluated yet - run again to continue[/yellow]")
-    console.print("report: docs/eval-report.md")
+    console.print(f"report: docs/eval-report{'' if eval_set == 'main' else '-' + eval_set}.md")
 
 
 @app.command("purge-history")

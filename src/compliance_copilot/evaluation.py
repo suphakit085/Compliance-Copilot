@@ -33,6 +33,14 @@ from .security import to_context
 
 GOLD = ROOT / "eval" / "golden_set.yaml"
 RESULTS = ROOT / "eval" / "results"
+EVAL_SETS = {"main": "golden_set.yaml", "holdout": "holdout_set.yaml"}
+
+
+def use_set(name: str) -> str:
+    """Point the evaluation at another question set; returns the file-name suffix for results."""
+    global GOLD
+    GOLD = ROOT / "eval" / EVAL_SETS[name]
+    return "" if name == "main" else f"-{name}"
 
 ABLATIONS: list[tuple[str, dict[str, Any]]] = [
     ("A. Fixed-size chunks + vector only (baseline)",
@@ -264,12 +272,14 @@ def merge_e2e(prev: dict[str, Any] | None, new: dict[str, Any]) -> dict[str, Any
 
 
 def run(retrieval: bool = True, end_to_end: bool = True, limit: int | None = None, log=print,
-        resume: bool = True) -> dict:
+        resume: bool = True, eval_set: str = "main") -> dict:
+    suffix = use_set(eval_set)
     RESULTS.mkdir(parents=True, exist_ok=True)
-    latest = RESULTS / "latest.json"
+    latest = RESULTS / f"latest{suffix}.json"
     prev = json.loads(latest.read_text(encoding="utf-8")) if latest.exists() else {}
     out: dict[str, Any] = {
         "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "eval_set": eval_set,
         "n_questions": len(load_gold()),
         "settings": {k: v for k, v in get_settings().model_dump().items()
                      if k in ("embedding_model", "reranker_model", "dense_top_k", "lexical_top_k",
@@ -295,14 +305,15 @@ def run(retrieval: bool = True, end_to_end: bool = True, limit: int | None = Non
         out["end_to_end"] = prev["end_to_end"]
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     payload = json.dumps(out, ensure_ascii=False, indent=1, default=str)
-    (RESULTS / f"eval-{stamp}.json").write_text(payload, encoding="utf-8")
+    (RESULTS / f"eval{suffix}-{stamp}.json").write_text(payload, encoding="utf-8")
     latest.write_text(payload, encoding="utf-8")
-    (ROOT / "docs" / "eval-report.md").write_text(render_markdown(out), encoding="utf-8")
+    (ROOT / "docs" / f"eval-report{suffix}.md").write_text(render_markdown(out), encoding="utf-8")
     return out
 
 
 def render_markdown(ev: dict[str, Any]) -> str:
-    lines = ["# Evaluation report", "", f"Generated {ev['created_at']} · golden set: {ev['n_questions']} questions "
+    title = "Evaluation report" + (" (held-out set)" if ev.get("eval_set") == "holdout" else "")
+    lines = [f"# {title}", "", f"Generated {ev['created_at']} · golden set: {ev['n_questions']} questions "
              "(`eval/golden_set.yaml`)", ""]
     if ev.get("retrieval_ablation"):
         cols = ["config", "hit@1", "hit@3", "hit@6", "recall@6", "mrr", "leakage", "latency_ms"]

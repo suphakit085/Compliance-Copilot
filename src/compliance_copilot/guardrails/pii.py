@@ -19,7 +19,7 @@ _THAI_ID = re.compile(r"(?<!\d)(\d)[\s-]?(\d{4})[\s-]?(\d{5})[\s-]?(\d{2})[\s-]?
 _CARD = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
 _ACCOUNT = re.compile(r"(?<!\d)\d{3}-\d-\d{5}-\d(?!\d)|(?<=บัญชี)\s*(?:เลขที่\s*)?\d{10,12}(?!\d)")
 _PHONE = re.compile(r"(?<![\d])(?:\+66[\s-]?|0)(?:[689]\d[\s-]?\d{3}[\s-]?\d{4}|[2-7][\s-]?\d{3}[\s-]?\d{4})(?!\d)")
-_PERSON = re.compile(r"(นางสาว|นาย|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.)\s?([ก-๙]+)(?:\s+([ก-๙]+))?")
+_PERSON = re.compile(r"(นางสาว|นาย|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.|คุณ)\s?([ก-๙]+)(?:\s+([ก-๙]+))?")
 _EN_PERSON = re.compile(r"\b(Mr|Mrs|Ms|Miss)\.?\s+[A-Z][a-z]+(\s+[A-Z][a-z]+)?")
 
 
@@ -74,6 +74,10 @@ def _mask_thai_names(t: str, found: Counter) -> str:
         title, first, last = m.group(1), m.group(2), m.group(3)
         w1 = word_tokenize(first, engine="newmm")[0]
         if title + w1 in words:
+            continue
+        # "คุณ" is also the pronoun "you" ("คุณช่วย…"); treat it as a title only when it is
+        # followed by a given name and a separate surname (over-masking is the safe failure).
+        if title == "คุณ" and (not last or len(first) > 20 or len(last) > 20):
             continue
         out.append(t[pos:m.start()])
         if len(first) > 20:  # given name runs straight into the rest of the sentence
