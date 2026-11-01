@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, History, Loader2, Quote, Scale, ShieldCheck } from "lucide-react";
 import { DemoCard } from "@/components/login/demo-card";
+import { SsoButton } from "@/components/login/sso-button";
 
 const DEMO = [
   { username: "somchai", label: "พนักงานสาขา", hint: "ระดับภายใน" },
@@ -144,6 +145,9 @@ export default function LoginPage() {
                   )}
                 </button>
               </form>
+              <Suspense fallback={null}>
+                <SsoButton />
+              </Suspense>
               <div className="mt-7 border-t pt-5">
                 <p className="mb-2 text-xs text-muted-foreground">บัญชีทดลอง · รหัสผ่านอยู่ใน config/users.yaml</p>
                 <div className="grid gap-1">

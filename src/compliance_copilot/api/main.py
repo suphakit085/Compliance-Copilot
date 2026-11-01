@@ -16,9 +16,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 
-from .. import __version__, audit, history, llm
+from .. import __version__, audit, history, llm, sso
 from ..config import ROOT, get_settings
-from ..db import AuditLog, Chunk, Document, Feedback, engine, init_db, session
+from ..db import AuditLog, Chunk, Document, Feedback, as_reader, engine, init_db, session
 from ..features import gap_analysis
 from ..generation.answerer import ChatResponse, answer_question
 from ..guardrails.pii import mask_pii
@@ -105,6 +105,51 @@ def login(body: LoginIn) -> LoginOut:
         audit.log_event("login_failed", {"username": body.username})
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
     audit.log_event("login", {}, user)
+    return LoginOut(access_token=issue_token(user), user=_user_out(user))
+
+
+class SSOConfig(BaseModel):
+    enabled: bool
+    label: str = ""
+
+
+class SSOStart(BaseModel):
+    url: str
+    state_token: str
+
+
+class SSOCallback(BaseModel):
+    code: str
+    state: str
+    state_token: str
+
+
+@app.get("/auth/sso/config", response_model=SSOConfig, tags=["auth"])
+def sso_config() -> SSOConfig:
+    return SSOConfig(enabled=sso.enabled(), label=get_settings().oidc_label)
+
+
+@app.get("/auth/sso/start", response_model=SSOStart, tags=["auth"])
+def sso_start() -> SSOStart:
+    if not sso.enabled():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "SSO is not configured")
+    try:
+        url, token = sso.begin()
+    except sso.SSOError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    return SSOStart(url=url, state_token=token)
+
+
+@app.post("/auth/sso/callback", response_model=LoginOut, tags=["auth"])
+def sso_callback(body: SSOCallback) -> LoginOut:
+    if not sso.enabled():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "SSO is not configured")
+    try:
+        user = sso.complete(body.code, body.state, body.state_token)
+    except sso.SSOError as e:
+        audit.log_event("login_failed", {"method": "sso", "reason": str(e)})
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from e
+    audit.log_event("login", {"method": "sso"}, user)
     return LoginOut(access_token=issue_token(user), user=_user_out(user))
 
 
@@ -208,6 +253,7 @@ def _visible(user: UserContext):
 @app.get("/documents", tags=["documents"])
 def documents(user: Annotated[UserContext, Depends(current_user)]) -> list[dict[str, Any]]:
     with session() as db:
+        as_reader(db.connection(), user)
         rows = db.execute(
             select(Document, func.count(Chunk.id))
             .join(Chunk, (Chunk.document_id == Document.id) & (Chunk.strategy == "structured"), isouter=True)
@@ -235,6 +281,7 @@ def documents(user: Annotated[UserContext, Depends(current_user)]) -> list[dict[
 @app.get("/documents/{doc_id}/sections", tags=["documents"])
 def sections(doc_id: str, user: Annotated[UserContext, Depends(current_user)]) -> list[dict[str, Any]]:
     with session() as db:
+        as_reader(db.connection(), user)
         doc = db.execute(select(Document).where(Document.id == doc_id, _visible(user))).scalar_one_or_none()
         if not doc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found")

@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-change-me"
     jwt_ttl_minutes: int = 480
     pii_masking: bool = True
+    # Single sign-on (OpenID Connect). Leave oidc_issuer empty to use only the demo login.
+    oidc_issuer: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_redirect_uri: str = "http://localhost:3000/api/auth/sso/callback"
+    oidc_groups_claim: str = "groups"
+    oidc_group_map: Path | None = None  # default: config/sso.yaml
+    oidc_label: str = "SSO ขององค์กร"
     # Chat history retention (days); set by the DPO / legal team. 0 disables saving history.
     chat_retention_days: int = 90
 

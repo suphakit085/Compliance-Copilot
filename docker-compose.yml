@@ -17,5 +17,22 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # Local identity provider for trying single sign-on:  docker compose --profile sso up -d keycloak
+  # Realm, client and demo users are imported from config/keycloak/ (test values only).
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    profiles: ["sso"]
+    container_name: compliance-copilot-idp
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8081
+      KC_HOSTNAME: http://localhost:8081
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./config/keycloak:/opt/keycloak/data/import:ro
+
 volumes:
   pgdata:

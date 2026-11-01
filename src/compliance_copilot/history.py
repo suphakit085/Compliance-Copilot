@@ -19,7 +19,7 @@ from typing import Any
 from sqlalchemy import delete, func, select
 
 from .config import get_settings
-from .db import Conversation, ConversationMessage, Document, session
+from .db import Conversation, ConversationMessage, Document, as_reader, session
 from .retrieval.retriever import UserContext
 
 WITHHELD = (
@@ -93,6 +93,7 @@ def _allowed_docs(user: UserContext, doc_ids: set[str]) -> set[str]:
     if not doc_ids:
         return set()
     with session() as db:
+        as_reader(db.connection(), user)
         rows = db.execute(select(Document).where(Document.id.in_(doc_ids))).scalars()
         return {
             d.id for d in rows

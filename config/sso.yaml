@@ -1,0 +1,21 @@
+# Maps identity-provider groups (the "groups" claim) to what the Copilot enforces.
+# In production the bank's IAM team owns the groups; this file only says what each means.
+# A user in several mapped groups gets the highest clearance among them; a user in none
+# of them is refused (no implicit access).
+groups:
+  copilot-employee:
+    role: employee
+    department: retail
+    clearance: internal
+  copilot-compliance:
+    role: compliance_officer
+    department: compliance
+    clearance: confidential
+  copilot-audit:
+    role: auditor
+    department: internal_audit
+    clearance: confidential
+  copilot-admin:
+    role: admin
+    department: it
+    clearance: restricted

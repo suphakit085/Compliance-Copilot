@@ -60,8 +60,30 @@ prefiltered rows with document frequencies cached from the corpus. Explicit refe
 The ACL predicate (`classification_level <= clearance AND (departments = [] OR department ∈
 departments)`) and the effective-date predicate are part of every first-stage SQL query.
 Consequences: restricted text cannot reach the reranker, the prompt, the answer or the
-audit log; and there is one place to review. Next step: Postgres row-level security as a
-second, independent layer.
+audit log; and there is one place to review.
+
+**Second layer: Postgres row-level security.** A query that forgets that predicate is the
+classic way an ACL fails, so the database enforces it too. Reads made on behalf of a user
+run `SET LOCAL ROLE copilot_reader` and pass the user's clearance and department as
+transaction-local settings (`app.clearance`, `app.department`); RLS policies on `documents`
+and `chunks` then hide every row the user may not see. The role has `SELECT` only, and with
+no settings it sees nothing (fail closed). A test deletes the ACL lines from the retrieval
+SQL and asserts that the confidential procedure still does not leak. Ingestion, audit and
+admin tasks keep the owner connection, which RLS does not apply to; BM25 corpus statistics
+are computed on that connection so ranking does not depend on who is asking.
+
+### Single sign-on (OIDC)
+`sso.py` implements the authorization-code flow with PKCE against any OIDC provider
+(Keycloak locally; Entra ID / Okta in production). The web tier's `/api/auth/sso/*` routes
+only move the browser around: the API creates a signed state token (CSRF `state`, `nonce`,
+PKCE verifier) that lives in a short-lived httpOnly cookie, exchanges the code, and verifies
+the ID token's signature (JWKS), issuer, audience, expiry and nonce. Role, department and
+clearance come from the IdP's `groups` claim through `config/sso.yaml` (highest clearance
+wins; no mapped group = refused), so access is granted and revoked in the bank's IAM, not
+here. Users are provisioned on first sign-in and linked by the stable `sub` claim, never by
+username: an IdP user called `somchai` becomes `somchai.sso` and cannot touch the local
+account. SSO accounts have no password and cannot use the demo login. After sign-in the
+user holds the same session token as before, so RBAC, RLS and audit are unchanged.
 
 ### Verify citations in code, not by trusting the model
 The model returns `{answer, citations: [{source_id, quote}]}`. Each quote must be found in
@@ -112,7 +134,8 @@ request, so revoking access is immediate.
 | Risk | Control |
 |---|---|
 | Hallucinated legal requirement | Quote verification, abstention threshold, "partial"/"insufficient" statuses, disclaimer |
-| Unauthorised disclosure | ACL in retrieval SQL, department scoping, API role checks, 404 (not 403) for hidden documents |
+| Unauthorised disclosure | ACL in retrieval SQL **and** Postgres row-level security (fail closed), department scoping, API role checks, 404 (not 403) for hidden documents |
+| Credential sprawl / slow offboarding | OIDC SSO with PKCE; access from IdP groups, re-evaluated at every sign-in; SSO users have no local password |
 | Customer PII sent to LLM / logs | Regex + checksum PII masking before LLM, audit stores masked text only |
 | Prompt injection (user or document) | Input screening, system prompt treats sources/questions as data, ACL independent of the model |
 | Stale rules | Effective dating, as-of queries, amendment notices, SHA-256 pinned sources |
