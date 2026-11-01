@@ -56,6 +56,10 @@ citation is *checked against the source text by code* before it is shown.
 - **Document governance** — internal policies cannot enter the index without an owner, approver,
   approval date and review date; only `approved` ones are searchable, review reminders show in
   the UI, and `copilot check-updates` detects when a regulator changes a pinned source.
+- **Adoption controls** — users accept versioned acceptable-use terms (enforced by the API, audited);
+  a thumbs-down opens a categorised problem report that compliance staff triage and close with a note the
+  reporter sees; a "confidential material shown" report is raised as an incident. User guide and training
+  plan, incident process, and a model-risk dossier with a generated evidence pack are in `docs/`.
 - **Policy Gap Analysis** — checks each clause of an internal policy against the
   regulations in force and produces a reviewable worklist with verified citations.
 - **Evaluation harness** — 218 questions in three sets (golden 51, held-out 21, extended 146),
@@ -199,7 +203,7 @@ flowchart LR
 | API | FastAPI, JWT, role-based endpoints | Authorisation lives server-side; the UI is untrusted |
 | Web | Next.js 16 + shadcn/ui, BFF proxy with httpOnly cookie | Session token is never readable by browser JavaScript |
 
-Details and design decisions: [`docs/architecture.md`](docs/architecture.md). Containers, CI, monitoring, backups and measured capacity: [`docs/deployment.md`](docs/deployment.md). Roles, intake rules and decisions the organisation must make: [`docs/governance.md`](docs/governance.md) (Thai).
+Details and design decisions: [`docs/architecture.md`](docs/architecture.md). Containers, CI, monitoring, backups and measured capacity: [`docs/deployment.md`](docs/deployment.md). Rolling it out: [`docs/user-guide.md`](docs/user-guide.md) (Thai: guide, training, pilot), [`docs/incident-process.md`](docs/incident-process.md) (Thai), [`docs/model-risk.md`](docs/model-risk.md) (Thai: risk register, validation, approval checklist) with the generated [`docs/evidence/model-card.md`](docs/evidence/model-card.md). Roles, intake rules and decisions the organisation must make: [`docs/governance.md`](docs/governance.md) (Thai).
 
 ## Thai document processing — the unglamorous part that matters
 
@@ -256,12 +260,14 @@ uv run copilot gap pol-pdpa-001 --out gap.md
 uv run copilot eval --no-e2e          # retrieval ablation only (no LLM calls)
 uv run copilot eval --set holdout     # held-out set (also: --set extended, --reviewed-only, --production-only)
 uv run copilot eval-review status     # how much of each set an expert has confirmed
+uv run copilot evidence-pack          # model card for model-risk review, generated from the running system
+uv run copilot feedback-report --open # unresolved problem reports (close with feedback-resolve)
 uv run copilot audit-verify
 uv run copilot add-policy my-policy.md --dry-run   # validate + preview a real policy before adding it
 uv run copilot check-updates          # has a regulator changed a pinned source? (read-only)
 uv run copilot governance             # reviews due, drafts, sample documents still in the corpus
 uv run copilot bench                  # retrieval capacity on this machine (no LLM)
-uv run pytest                         # 541 tests (integration tests need the DB)
+uv run pytest                         # 550 tests (integration tests need the DB)
 ```
 
 A scripted 4-minute demo walkthrough is in [`docs/demo-script.md`](docs/demo-script.md).
