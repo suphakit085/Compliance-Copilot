@@ -16,6 +16,7 @@ import jwt
 import yaml
 from sqlalchemy import select
 
+from . import ratelimit
 from .config import ROOT, get_settings
 from .db import CLEARANCE, User, init_db, session
 from .retrieval.retriever import UserContext
@@ -62,12 +63,68 @@ def to_context(u: User) -> UserContext:
     return UserContext(u.id, u.username, u.role, u.department, u.clearance, u.display_name)
 
 
+class LoginLocked(Exception):
+    """Too many failed attempts; ``retry_after`` is in seconds."""
+
+    def __init__(self, retry_after: float, newly_locked: bool = False, username: str | None = None):
+        super().__init__("login temporarily locked")
+        self.retry_after, self.newly_locked, self.username = retry_after, newly_locked, username
+
+
+_DUMMY_HASH = hash_password("not-a-real-password")  # equalises timing for unknown usernames
+
+
 def authenticate(username: str, password: str) -> UserContext | None:
+    """Verify a password. Raises LoginLocked after repeated failures.
+
+    Lockout state is kept in the database for real accounts (survives restarts and is shared
+    by replicas) and in memory for unknown usernames, with the same threshold and duration, so
+    an attacker cannot tell the two apart.
+    """
+    s = get_settings()
+    window = s.login_lock_minutes * 60
+    guess_key = f"login-guess:{username.lower()}"
+    now = datetime.now(UTC)
     with session() as db:
         u = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
-        if not u or not u.active or not check_password(password, u.password_hash):
+        if u and u.locked_until and u.locked_until > now:
+            raise LoginLocked((u.locked_until - now).total_seconds())
+        if not u:
+            if (retry := ratelimit.limiter.hit(guess_key, s.login_max_failures - 1, window)[0]):  # same count as real accounts
+                raise LoginLocked(retry)
+            check_password(password, _DUMMY_HASH)
             return None
-        return to_context(u)
+        if u.active and check_password(password, u.password_hash):
+            u.failed_logins, u.locked_until = 0, None
+            return to_context(u)
+        if not u.active:
+            check_password(password, _DUMMY_HASH)
+        u.failed_logins = (u.failed_logins or 0) + 1
+        if u.failed_logins >= s.login_max_failures:
+            u.failed_logins = 0
+            u.locked_until = now + timedelta(seconds=window)
+            db.commit()
+            raise LoginLocked(window, newly_locked=True, username=u.username)
+        return None
+
+
+def check_production_ready() -> None:
+    """Refuse to start in production with settings that are only acceptable on a laptop."""
+    s = get_settings()
+    if s.env != "production":
+        return
+    problems = []
+    if s.jwt_secret == "dev-only-change-me" or len(s.jwt_secret) < 32:
+        problems.append("COPILOT_JWT_SECRET must be a random value of at least 32 characters")
+    if s.password_login:
+        data = yaml.safe_load((ROOT / "config" / "users.yaml").read_text(encoding="utf-8"))
+        known = {u["username"]: u["password"] for u in data["users"]}
+        with session() as db:
+            for u in db.execute(select(User).where(User.active.is_(True))).scalars():
+                if u.username in known and check_password(known[u.username], u.password_hash):
+                    problems.append(f"demo account '{u.username}' still has its published password")
+    if problems:
+        raise RuntimeError("unsafe production configuration:\n  - " + "\n  - ".join(problems))
 
 
 def issue_token(user: UserContext) -> str:

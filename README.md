@@ -34,6 +34,9 @@ citation is *checked against the source text by code* before it is shown.
 - **Defence in depth** — the same permission rule is enforced twice: in the retrieval SQL and
   again by Postgres row-level security under a read-only role, so a query that forgets the
   filter still cannot return restricted text (tested by deleting the filter).
+- **Abuse protection** — lockout after repeated wrong passwords, rate limits on the expensive
+  endpoints, strict CSP/security headers, and a start-up check that refuses unsafe production
+  settings. See [`docs/security.md`](docs/security.md) for the deployment checklist.
 - **Single sign-on** — OpenID Connect (authorization code + PKCE). Role and clearance come from
   the identity provider's groups, not from this app; Keycloak included for local try-out.
 - **Time-aware answers** — "what was the gift limit as of June 2024?" retrieves the policy
@@ -228,7 +231,7 @@ uv run copilot audit-verify
 uv run copilot add-policy my-policy.md --dry-run   # validate + preview a real policy before adding it
 uv run copilot check-updates          # has a regulator changed a pinned source? (read-only)
 uv run copilot governance             # reviews due, drafts, sample documents still in the corpus
-uv run pytest                         # 89 tests (integration tests need the DB)
+uv run pytest                         # 99 tests (integration tests need the DB)
 ```
 
 A scripted 4-minute demo walkthrough is in [`docs/demo-script.md`](docs/demo-script.md).

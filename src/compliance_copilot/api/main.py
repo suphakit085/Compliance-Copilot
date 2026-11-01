@@ -10,7 +10,8 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
@@ -23,9 +24,18 @@ from ..features import gap_analysis
 from ..generation.answerer import ChatResponse, answer_question
 from ..guardrails.pii import mask_pii
 from ..ingestion.updates import read_lock
+from ..ratelimit import limiter
 from ..retrieval import models
 from ..retrieval.retriever import UserContext
-from ..security import ROLES_AUDIT, ROLES_GAP, authenticate, issue_token, user_from_token
+from ..security import (
+    ROLES_AUDIT,
+    ROLES_GAP,
+    LoginLocked,
+    authenticate,
+    check_production_ready,
+    issue_token,
+    user_from_token,
+)
 
 _bearer = HTTPBearer(auto_error=False)
 _models_ready = threading.Event()
@@ -34,6 +44,7 @@ _models_ready = threading.Event()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    check_production_ready()
     history.purge_expired()
 
     def warm() -> None:  # load embedding + reranker models in the background
@@ -53,13 +64,58 @@ app = FastAPI(
 )
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Cache-Control", "no-store")  # answers and documents are per-user data
+    if get_settings().env == "production":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+    return response
+
+
+if hosts := [h.strip() for h in get_settings().allowed_hosts.split(",") if h.strip()]:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
+
+
+def _too_many(scope: str, retry_after: float, user: UserContext | None = None, first: bool = False) -> HTTPException:
+    if first:  # one audit record per violation window, so an attacker cannot flood the audit chain
+        audit.log_event("rate_limited", {"scope": scope}, user)
+    return HTTPException(
+        status.HTTP_429_TOO_MANY_REQUESTS, "ส่งคำขอถี่เกินไป กรุณารอสักครู่แล้วลองใหม่",
+        headers={"Retry-After": str(int(retry_after))},
+    )
+
+
+def client_address(request: Request) -> str:
+    if get_settings().trust_proxy and (fwd := request.headers.get("x-forwarded-for")):
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def current_user(
     cred: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> UserContext:
     user = user_from_token(cred.credentials) if cred else None
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or expired token")
+    retry, first = limiter.hit(f"user:{user.id}", get_settings().rate_user_per_min, 60)
+    if retry:
+        raise _too_many("user", retry, user, first)
     return user
+
+
+def limited(scope: str, limit_attr: str, window_s: float):
+    """Stricter per-user limit for expensive endpoints (each call spends LLM quota)."""
+
+    def dep(user: Annotated[UserContext, Depends(current_user)]) -> UserContext:
+        retry, first = limiter.hit(f"{scope}:{user.id}", getattr(get_settings(), limit_attr), window_s)
+        if retry:
+            raise _too_many(scope, retry, user, first)
+        return user
+
+    return dep
 
 
 def require(roles: set[str]):
@@ -100,8 +156,23 @@ def _user_out(u: UserContext) -> UserOut:
 
 
 @app.post("/auth/login", response_model=LoginOut, tags=["auth"])
-def login(body: LoginIn) -> LoginOut:
-    user = authenticate(body.username, body.password)
+def login(body: LoginIn, request: Request) -> LoginOut:
+    s = get_settings()
+    if not s.password_login:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "password login is disabled; use SSO")
+    retry, first = limiter.hit(f"login-ip:{client_address(request)}", s.rate_login_ip_per_min, 60)
+    if retry:
+        raise _too_many("login-ip", retry, None, first)
+    try:
+        user = authenticate(body.username, body.password)
+    except LoginLocked as e:
+        if e.newly_locked:
+            audit.log_event("account_locked", {"username": e.username, "minutes": s.login_lock_minutes})
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"พยายามเข้าสู่ระบบผิดหลายครั้ง กรุณาลองใหม่ในอีก {max(int(e.retry_after // 60), 1)} นาที",
+            headers={"Retry-After": str(int(e.retry_after))},
+        ) from e
     if not user:
         audit.log_event("login_failed", {"username": body.username})
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
@@ -175,7 +246,7 @@ class ChatIn(BaseModel):
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["chat"])
-def chat(body: ChatIn, user: Annotated[UserContext, Depends(current_user)]) -> ChatResponse:
+def chat(body: ChatIn, user: Annotated[UserContext, Depends(limited("chat", "rate_chat_per_min", 60))]) -> ChatResponse:
     if not history.enabled():
         return answer_question(body.question, user, [t.model_dump() for t in body.history[-6:]], body.as_of)
     # Follow-up context comes from the server-side record, not from the client.
@@ -317,7 +388,11 @@ class GapIn(BaseModel):
 
 
 @app.post("/gap-analysis", response_model=gap_analysis.GapReport, tags=["gap analysis"])
-def run_gap(body: GapIn, user: Annotated[UserContext, Depends(require(ROLES_GAP))]) -> gap_analysis.GapReport:
+def run_gap(
+    body: GapIn,
+    user: Annotated[UserContext, Depends(require(ROLES_GAP))],
+    _: Annotated[UserContext, Depends(limited("gap", "rate_gap_per_10min", 600))],
+) -> gap_analysis.GapReport:
     if not llm.available():
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "LLM is not configured")
     try:

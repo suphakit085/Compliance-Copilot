@@ -124,6 +124,8 @@ class User(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     # "<issuer>|<sub>" for users provisioned from the identity provider
     external_id: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AuditLog(Base):
@@ -264,6 +266,8 @@ def init_db() -> None:
     Base.metadata.create_all(engine())
     with engine().begin() as conn:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS external_id text UNIQUE"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins integer NOT NULL DEFAULT 0"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until timestamptz"))
         conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS governance jsonb NOT NULL DEFAULT '{}'"))
         conn.execute(text(_RLS))
 

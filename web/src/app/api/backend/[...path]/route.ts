@@ -31,10 +31,9 @@ async function forward(request: NextRequest, ctx: { params: Promise<{ path: stri
   if (res.status === 401) {
     store.delete(SESSION_COOKIE);
   }
-  return new Response(res.body, {
-    status: res.status,
-    headers: { "Content-Type": res.headers.get("content-type") ?? "application/json" },
-  });
+  const headers: Record<string, string> = { "Content-Type": res.headers.get("content-type") ?? "application/json" };
+  if (res.status === 429) headers["Retry-After"] = res.headers.get("retry-after") ?? "60";
+  return new Response(res.body, { status: res.status, headers });
 }
 
 export { forward as GET, forward as POST };
