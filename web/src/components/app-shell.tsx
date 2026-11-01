@@ -5,13 +5,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
-  BarChart3, BookOpenText, FileSearch, LogOut, Menu, MessageSquareText, Moon, Scale, ScrollText, Sun,
+  BarChart3, BookOpenText, FileSearch, Flag, LifeBuoy, LogOut, Menu, MessageSquareText, Moon, Scale, ScrollText, Sun,
 } from "lucide-react";
 import { api, CLEARANCE_LABEL, ROLE_LABEL, type Role, type User } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { HistoryList } from "@/components/history-list";
+import { TermsGate } from "@/components/terms-gate";
 
 const UserContext = createContext<User | null>(null);
 export const useUser = () => useContext(UserContext);
@@ -28,7 +29,9 @@ const NAV: { href: string; label: string; icon: React.ElementType; roles?: Role[
   { href: "/documents", label: "คลังเอกสาร", icon: BookOpenText },
   { href: "/gap", label: "Gap Analysis", icon: FileSearch, roles: ["compliance_officer", "admin"] },
   { href: "/audit", label: "Audit Trail", icon: ScrollText, roles: ["compliance_officer", "auditor", "admin"] },
+  { href: "/reports", label: "รายงานปัญหา", icon: Flag, roles: ["compliance_officer", "auditor", "admin"] },
   { href: "/eval", label: "Evaluation", icon: BarChart3 },
+  { href: "/help", label: "คู่มือ", icon: LifeBuoy },
 ];
 
 function Logo({ compact = false }: { compact?: boolean }) {
@@ -139,6 +142,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <UserContext.Provider value={user}>
+      <TermsGate user={user} onAccepted={setUser} />
       <div className="flex h-dvh overflow-hidden">
         <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
           {sidebar}

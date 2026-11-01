@@ -22,7 +22,12 @@ from .db import AuditLog, Feedback, User, session
 INBOX = ROOT / "eval" / "inbox"
 
 
-def report(days: int = 30, include_positive: bool = False) -> list[dict[str, Any]]:
+CATEGORIES = ("wrong_answer", "missing_source", "outdated", "should_refuse", "leak", "other")
+STATUSES = ("open", "resolved", "dismissed")
+
+
+def report(days: int = 30, include_positive: bool = False, status: str | None = None,
+           user_id: int | None = None) -> list[dict[str, Any]]:
     since = datetime.now(UTC) - timedelta(days=days)
     with session() as db:
         q = (select(Feedback, AuditLog, User.username)
@@ -31,12 +36,18 @@ def report(days: int = 30, include_positive: bool = False) -> list[dict[str, Any
              .where(Feedback.ts >= since).order_by(Feedback.ts.desc()))
         if not include_positive:
             q = q.where(Feedback.rating < 0)
+        if status:
+            q = q.where(Feedback.status == status)
+        if user_id is not None:
+            q = q.where(Feedback.user_id == user_id)
         rows = db.execute(q).all()
         out = []
         for fb, audit, username in rows:
             p = audit.payload or {}
             g = p.get("grounding") or {}
             out.append({
+                "id": fb.id, "category": fb.category, "report_status": fb.status, "resolution": fb.resolution,
+                "resolved_by": fb.resolved_by,
                 "audit_id": audit.id, "ts": fb.ts.isoformat(timespec="seconds"), "rating": fb.rating,
                 "user": username, "role": audit.role, "status": p.get("status"),
                 "question": p.get("question_masked"), "as_of": p.get("as_of"),
@@ -44,6 +55,20 @@ def report(days: int = 30, include_positive: bool = False) -> list[dict[str, Any
                 "retrieved": [r["chunk_id"] for r in p.get("retrieved", [])],
             })
         return out
+
+
+def resolve(feedback_id: int, by: str, note: str, status: str = "resolved") -> dict[str, Any]:
+    """Close a problem report with what was done about it (shown to the person who reported it)."""
+    if status not in ("resolved", "dismissed"):
+        raise ValueError("status must be resolved or dismissed")
+    if not note.strip():
+        raise ValueError("a resolution note is required: say what was changed or why nothing was")
+    with session() as db:
+        fb = db.get(Feedback, feedback_id)
+        if not fb or fb.rating >= 0:
+            raise ValueError(f"problem report {feedback_id} not found")
+        fb.status, fb.resolved_at, fb.resolved_by, fb.resolution = status, datetime.now(UTC), by, note.strip()
+        return {"id": fb.id, "audit_id": fb.audit_id, "category": fb.category, "status": status}
 
 
 def draft_question(audit_id: int, out_dir: Path | None = None) -> Path:

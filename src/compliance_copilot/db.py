@@ -125,6 +125,8 @@ class User(Base):
     # "<issuer>|<sub>" for users provisioned from the identity provider
     external_id: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
+    terms_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -158,6 +160,12 @@ class Feedback(Base):
     rating: Mapped[int] = mapped_column(Integer)  # +1 / -1
     comment: Mapped[str | None] = mapped_column(Text)
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # problem reports (rating < 0): what kind, who is handling it, how it ended
+    category: Mapped[str | None] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(20), default="open")  # open | resolved | dismissed
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by: Mapped[str | None] = mapped_column(String(60))
+    resolution: Mapped[str | None] = mapped_column(Text)
 
 
 class Conversation(Base):
@@ -268,6 +276,13 @@ def init_db() -> None:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS external_id text UNIQUE"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins integer NOT NULL DEFAULT 0"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until timestamptz"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version varchar(40)"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz"))
+        for ddl in (
+            "category varchar(30)", "status varchar(20) NOT NULL DEFAULT 'open'", "resolved_at timestamptz",
+            "resolved_by varchar(60)", "resolution text",
+        ):
+            conn.execute(text(f"ALTER TABLE feedback ADD COLUMN IF NOT EXISTS {ddl}"))
         conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS governance jsonb NOT NULL DEFAULT '{}'"))
         conn.execute(text(_RLS))
 

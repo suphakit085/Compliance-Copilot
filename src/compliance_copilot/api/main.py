@@ -9,9 +9,9 @@ import logging
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -20,9 +20,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 
-from .. import __version__, audit, governance, history, llm, observability, sso
+from .. import __version__, audit, governance, history, llm, observability, sso, terms
+from .. import feedback as feedback_mod
 from ..config import ROOT, get_settings
-from ..db import AuditLog, Chunk, Document, Feedback, as_reader, engine, init_db, session
+from ..db import AuditLog, Chunk, Document, Feedback, User, as_reader, engine, init_db, session
 from ..features import gap_analysis
 from ..generation.answerer import ChatResponse, answer_question, stream_answer
 from ..guardrails.pii import mask_pii
@@ -161,6 +162,8 @@ def limited(scope: str, limit_attr: str, window_s: float):
     """Stricter per-user limit for expensive endpoints (each call spends LLM quota)."""
 
     def dep(user: Annotated[UserContext, Depends(current_user)]) -> UserContext:
+        if not user.terms_ok:  # the UI shows the terms; this is what actually enforces them
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "ต้องยอมรับข้อตกลงการใช้งานก่อนใช้ฟีเจอร์นี้")
         retry, first = limiter.hit(f"{scope}:{user.id}", getattr(get_settings(), limit_attr), window_s)
         if retry:
             raise _too_many(scope, retry, user, first)
@@ -194,6 +197,8 @@ class UserOut(BaseModel):
     role: str
     department: str
     clearance: int
+    terms_required: bool = False
+    terms_accepted: bool = True
 
 
 class LoginOut(BaseModel):
@@ -203,7 +208,8 @@ class LoginOut(BaseModel):
 
 def _user_out(u: UserContext) -> UserOut:
     return UserOut(id=u.id, username=u.username, display_name=u.display_name, role=u.role,
-                   department=u.department, clearance=u.clearance)
+                   department=u.department, clearance=u.clearance,
+                   terms_required=get_settings().terms_required, terms_accepted=u.terms_ok)
 
 
 @app.post("/auth/login", response_model=LoginOut, tags=["auth"])
@@ -280,6 +286,36 @@ def sso_callback(body: SSOCallback) -> LoginOut:
 
 @app.get("/me", response_model=UserOut, tags=["auth"])
 def me(user: Annotated[UserContext, Depends(current_user)]) -> UserOut:
+    return _user_out(user)
+
+
+class TermsOut(BaseModel):
+    version: str
+    text: str
+    required: bool
+    accepted: bool
+
+
+class AcceptIn(BaseModel):
+    version: str
+
+
+@app.get("/terms", response_model=TermsOut, tags=["auth"])
+def get_terms(user: Annotated[UserContext, Depends(current_user)]) -> TermsOut:
+    version, text = terms.load()
+    return TermsOut(version=version, text=text, required=get_settings().terms_required, accepted=user.terms_ok)
+
+
+@app.post("/me/accept-terms", response_model=UserOut, tags=["auth"])
+def accept_terms(body: AcceptIn, user: Annotated[UserContext, Depends(current_user)]) -> UserOut:
+    """Record acceptance of the *current* terms; a stale version (text changed meanwhile) is refused."""
+    if body.version != terms.current_version():
+        raise HTTPException(status.HTTP_409_CONFLICT, "the terms changed - reload and read the current version")
+    with session() as db:
+        row = db.get(User, user.id)
+        row.terms_version, row.terms_accepted_at = body.version, datetime.now(UTC)
+    audit.log_event("terms_accepted", {"version": body.version}, user)
+    user.terms_ok = True
     return _user_out(user)
 
 
@@ -391,16 +427,57 @@ class FeedbackIn(BaseModel):
     audit_id: int
     rating: int = Field(ge=-1, le=1)
     comment: str | None = Field(default=None, max_length=1000)
+    category: Literal["wrong_answer", "missing_source", "outdated", "should_refuse", "leak", "other"] | None = None
 
 
 @app.post("/feedback", tags=["chat"])
 def feedback(body: FeedbackIn, user: Annotated[UserContext, Depends(current_user)]) -> dict:
+    """Thumbs up/down. A thumbs-down is a problem report: it gets a category, starts as `open`, and a
+    report that confidential material was shown (`leak`) is also raised as an audited incident."""
     with session() as db:
         row = db.get(AuditLog, body.audit_id)
         if not row or row.user_id != user.id:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "answer not found")
-        db.add(Feedback(audit_id=body.audit_id, user_id=user.id, rating=body.rating, comment=body.comment))
-    return {"ok": True}
+        fb = Feedback(audit_id=body.audit_id, user_id=user.id, rating=body.rating, comment=body.comment,
+                      category=(body.category or "other") if body.rating < 0 else None)
+        db.add(fb)
+        db.flush()
+        report_id = fb.id
+    if body.rating < 0 and body.category == "leak":
+        audit.log_event("incident_reported", {"feedback_id": report_id, "audit_id": body.audit_id,
+                                              "category": "leak"}, user)
+    return {"ok": True, "report_id": report_id if body.rating < 0 else None}
+
+
+@app.get("/feedback/mine", tags=["chat"])
+def my_reports(user: Annotated[UserContext, Depends(current_user)]) -> list[dict[str, Any]]:
+    """The user's own problem reports and what became of them."""
+    rows = feedback_mod.report(days=365, user_id=user.id)
+    return [{k: r[k] for k in ("id", "ts", "category", "report_status", "resolution", "question")} for r in rows]
+
+
+@app.get("/feedback/reports", tags=["audit"])
+def problem_reports(
+    user: Annotated[UserContext, Depends(require(ROLES_AUDIT))], status_: str | None = Query(None, alias="status"),
+    days: int = Query(90, le=365),
+) -> list[dict[str, Any]]:
+    return feedback_mod.report(days=days, status=status_)
+
+
+class ResolveIn(BaseModel):
+    status: Literal["resolved", "dismissed"] = "resolved"
+    note: str = Field(min_length=3, max_length=1000)
+
+
+@app.post("/feedback/{report_id}/resolve", tags=["audit"])
+def resolve_report(report_id: int, body: ResolveIn,
+                   user: Annotated[UserContext, Depends(require(ROLES_GAP))]) -> dict[str, Any]:
+    try:
+        out = feedback_mod.resolve(report_id, user.username, body.note, body.status)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
+    audit.log_event("report_resolved", {**out, "note": body.note}, user)
+    return out
 
 
 # ------------------------------------------------------------------------ documents

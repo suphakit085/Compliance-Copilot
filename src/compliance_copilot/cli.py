@@ -344,6 +344,7 @@ def review_status(sets: Annotated[str, typer.Option(help="Comma-separated sets")
 def feedback_report(
     days: int = 30,
     positive: Annotated[bool, typer.Option(help="Include 👍 as well")] = False,
+    open_only: Annotated[bool, typer.Option("--open", help="Only reports nobody has resolved yet")] = False,
     draft: Annotated[int | None, typer.Option(help="Audit id to turn into a draft evaluation question")] = None,
 ) -> None:
     """Thumbs-down answers of the last N days, and (with --draft ID) a question skeleton for an expert."""
@@ -352,14 +353,49 @@ def feedback_report(
     if draft is not None:
         console.print(f"draft written: {feedback.draft_question(draft)}")
         return
-    rows = feedback.report(days, positive)
+    rows = feedback.report(days, positive, status="open" if open_only else None)
     table = Table(title=f"{'Feedback' if positive else 'Thumbs-down answers'}, last {days} days")
-    for c in ("audit", "when", "status", "support", "question", "comment"):
+    for c in ("report", "audit", "when", "kind", "handling", "answer", "question", "comment"):
         table.add_column(c)
     for r in rows:
-        table.add_row(str(r["audit_id"]), r["ts"][:16], str(r["status"]), str(r["support_rate"]),
-                      (r["question"] or "")[:60], (r["comment"] or "")[:40])
+        table.add_row(str(r["id"]), str(r["audit_id"]), r["ts"][:16], str(r["category"] or "-"), r["report_status"],
+                      str(r["status"]), (r["question"] or "")[:50], (r["comment"] or "")[:36])
     console.print(table if rows else "no feedback in this period")
+
+
+@app.command("feedback-resolve")
+def feedback_resolve(
+    report_id: int,
+    note: Annotated[str, typer.Option(help="What was changed, or why nothing was (shown to the reporter)")],
+    by: Annotated[str, typer.Option(help="Your name")] = "cli",
+    dismiss: Annotated[bool, typer.Option(help="Close without a change (not a defect)")] = False,
+) -> None:
+    """Close a problem report with what was done about it."""
+    from . import feedback
+
+    try:
+        out = feedback.resolve(report_id, by, note, "dismissed" if dismiss else "resolved")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
+    console.print(f"report {out['id']} {out['status']}")
+
+
+@app.command("evidence-pack")
+def evidence_pack(
+    out: Annotated[str, typer.Option(help="Where to write the model card")] = "docs/evidence/model-card.md",
+) -> None:
+    """Generate the model card for model-risk review from the running system (versions, corpus,
+    evaluation results, live control checks, findings)."""
+    from pathlib import Path
+
+    from .evidence import build, write
+
+    path = write(Path(out))
+    findings = [ln for ln in build().split("## 5. Findings to resolve before approval")[1].split("## 6.")[0].splitlines() if ln.startswith("- **")]
+    console.print(f"wrote {path} - {len(findings)} finding(s) to resolve before approval")
+    for f in findings:
+        console.print(f"  {f}")
 
 
 @app.command("purge-history")

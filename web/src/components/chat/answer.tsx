@@ -14,6 +14,7 @@ import { useToday } from "@/lib/use-today";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ReportDialog } from "@/components/chat/report-dialog";
 
 const STATUS: Record<Status, { label: string; className: string; icon: React.ElementType }> = {
   answered: { label: "ตอบจากแหล่งอ้างอิงที่ตรวจสอบแล้ว", className: "bg-emerald-600/10 text-emerald-700 dark:text-emerald-400", icon: CheckCircle2 },
@@ -35,6 +36,7 @@ export function Answer({
   onFollowUp: (q: string) => void;
 }) {
   const [rated, setRated] = useState<number | null>(null);
+  const [reporting, setReporting] = useState(false);
   const today = useToday();
   const st = STATUS[r.status];
   const g = r.grounding ?? {};
@@ -121,9 +123,10 @@ export function Answer({
             <Button variant="ghost" size="icon-sm" aria-label="มีประโยชน์" onClick={() => rate(1)} className={cn(rated === 1 && "text-success")}>
               <ThumbsUp />
             </Button>
-            <Button variant="ghost" size="icon-sm" aria-label="ไม่มีประโยชน์" onClick={() => rate(-1)} className={cn(rated === -1 && "text-red-600")}>
+            <Button variant="ghost" size="icon-sm" aria-label="รายงานปัญหาของคำตอบนี้" title="รายงานปัญหา" onClick={() => setReporting(true)} className={cn(rated === -1 && "text-red-600")}>
               <ThumbsDown />
             </Button>
+            <ReportDialog auditId={r.audit_id} open={reporting} onClose={() => setReporting(false)} onSent={() => setRated(-1)} />
           </>
         )}
         <Collapsible>

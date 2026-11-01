@@ -11,6 +11,46 @@ export interface User {
   role: Role;
   department: string;
   clearance: number;
+  terms_required: boolean;
+  terms_accepted: boolean;
+}
+
+export interface TermsInfo {
+  version: string;
+  text: string;
+  required: boolean;
+  accepted: boolean;
+}
+
+export type ReportCategory = "wrong_answer" | "missing_source" | "outdated" | "should_refuse" | "leak" | "other";
+
+export const REPORT_CATEGORIES: { value: ReportCategory; label: string; hint: string }[] = [
+  { value: "wrong_answer", label: "คำตอบไม่ถูกต้อง", hint: "ตัวเลข เงื่อนไข หรือข้อสรุปไม่ตรงกับต้นฉบับ" },
+  { value: "missing_source", label: "อ้างอิงไม่ตรงหรือขาดหายไป", hint: "ป้ายอ้างอิงชี้ไปข้อความที่ไม่เกี่ยวข้อง หรือไม่มีแหล่งที่ควรมี" },
+  { value: "outdated", label: "ใช้ฉบับที่ล้าสมัย", hint: "มีฉบับแก้ไขหรือฉบับใหม่ที่ระบบไม่ได้ใช้" },
+  { value: "should_refuse", label: "ควรตอบได้ แต่ระบบปฏิเสธ", hint: "ข้อมูลมีในเอกสารแต่ระบบบอกว่าไม่พบ" },
+  { value: "leak", label: "เห็นข้อมูลที่ไม่ควรเห็น", hint: "เอกสารลับหรือข้อมูลที่เกินสิทธิ์ของฉัน (เหตุการณ์ด่วน)" },
+  { value: "other", label: "อื่น ๆ", hint: "ปัญหาอื่นที่ไม่เข้าข้อข้างต้น" },
+];
+
+export interface MyReport {
+  id: number;
+  ts: string;
+  category: ReportCategory;
+  report_status: "open" | "resolved" | "dismissed";
+  resolution: string | null;
+  question: string;
+}
+
+export interface ProblemReport extends MyReport {
+  audit_id: number;
+  user: string;
+  role: string;
+  status: string;
+  support_rate: number | null;
+  comment: string | null;
+  resolved_by: string | null;
+  retrieved: string[];
 }
 
 export interface Source {
