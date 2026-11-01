@@ -35,6 +35,9 @@ use an on-premises model behind the same `LLMProvider` interface.
 
 ## Expected from the deployment
 
+A production-shaped compose file, secrets generator and the steps to run it are in
+[`deployment.md`](deployment.md).
+
 - **TLS** terminates at a reverse proxy / ingress in front of both services. Set
   `COPILOT_ENV=production` and run the web app with `NODE_ENV=production` so cookies are `Secure`
   and HSTS is sent. Keep the API on a private network; only the web tier needs to reach it.
