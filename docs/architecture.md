@@ -144,6 +144,7 @@ request, so revoking access is immediate.
 |---|---|
 | Hallucinated legal requirement | Quote verification, abstention threshold, "partial"/"insufficient" statuses, disclaimer |
 | Unauthorised disclosure | ACL in retrieval SQL **and** Postgres row-level security (fail closed), department scoping, API role checks, 404 (not 403) for hidden documents |
+| Password guessing / abuse of LLM quota | Account lockout (DB-backed), per-address and per-user rate limits, uniform responses for unknown usernames |
 | Credential sprawl / slow offboarding | OIDC SSO with PKCE; access from IdP groups, re-evaluated at every sign-in; SSO users have no local password |
 | Customer PII sent to LLM / logs | Regex + checksum PII masking before LLM, audit stores masked text only |
 | Prompt injection (user or document) | Input screening, system prompt treats sources/questions as data, ACL independent of the model |
