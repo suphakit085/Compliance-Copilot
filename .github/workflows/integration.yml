@@ -39,8 +39,8 @@ jobs:
       COPILOT_DEVICE: cpu
       HF_HOME: ${{ github.workspace }}/.hf
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
         with:
           version: "0.12.13"
           python-version: "3.12"
@@ -54,12 +54,12 @@ jobs:
           uv pip install --no-deps -e .
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: Cache retrieval models
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .hf
           key: hf-bge-m3-reranker-v2-m3-v1
       - name: Cache regulation PDFs
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: data/raw/*.pdf
           key: corpus-${{ hashFiles('data/sources.yaml', 'data/raw/manifest.lock.json') }}
@@ -82,7 +82,7 @@ jobs:
         run: copilot eval --no-e2e --production-only --set extended --min-hit6 0.90
       - name: Keep the evaluation report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: eval-report
           path: |
