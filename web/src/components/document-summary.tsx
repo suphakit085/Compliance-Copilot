@@ -98,7 +98,7 @@ export function DocumentSummary({ doc, onOpenUnit }: { doc: DocumentInfo; onOpen
             <BadgeCheck className="size-4" /> รับรองโดย {summary.reviewed_by} · {summary.reviewed_at?.slice(0, 10)}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+          <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
             <TriangleAlert className="size-4" /> สรุปโดย AI ยังไม่ผ่านการรับรองโดยเจ้าหน้าที่ Compliance
           </span>
         )}
@@ -139,7 +139,7 @@ export function DocumentSummary({ doc, onOpenUnit }: { doc: DocumentInfo; onOpen
                         key={k}
                         title={`"${c.quote}"`}
                         onClick={() => onOpenUnit(c.chunk_id)}
-                        className="rounded-md bg-brand/15 px-2 py-0.5 text-xs font-semibold text-[#4db8ff] transition hover:bg-brand/25"
+                        className="min-h-6 rounded-md bg-brand/15 px-2 py-0.5 text-xs font-semibold text-brand-strong transition hover:bg-brand/25"
                       >
                         {c.label}
                       </button>

@@ -48,6 +48,9 @@ citation is *checked against the source text by code* before it is shown.
   obligations, deadlines, prohibitions, penalties, exceptions, commencement), stored per document
   version, marked stale when the text changes, and signed off by a compliance officer. Chat recognises
   such requests and links to the full summary.
+- **Accessible UI** — WCAG 2.1 AA scan of every page in both themes (axe-core), visible focus
+  everywhere, 24 px touch targets; re-runnable with `scripts/ui-audit.mjs`
+  ([`docs/ui-quality.md`](docs/ui-quality.md)).
 - **Time-aware answers** — "what was the gift limit as of June 2024?" retrieves the policy
   version in force on that date; pending amendments (e.g. SEC ทธ. 53/2568 amending
   ทธ. 35/2556) are surfaced as warnings.

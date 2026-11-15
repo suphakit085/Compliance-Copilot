@@ -39,23 +39,65 @@ function pct(v: number | null | undefined) {
   return v === null || v === undefined ? "–" : `${Math.round(v * 100)}%`;
 }
 
+interface SetRow { key: string; label: string; tuned: boolean; blind: boolean; questions: number; hit6: number | null; behaviour: number | null; key_facts: number | null; leakage: number | null; reviewed: number }
+
+/** All question sets side by side. The golden set was used to tune the system, so its numbers are
+ *  optimistic by construction; the first blind runs are the honest estimate for new questions. */
+function AllSets({ rows }: { rows: SetRow[] }) {
+  return (
+    <section className="panel p-5">
+      <h2 className="font-medium">ทุกชุดคำถาม</h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        ตัวเลขที่ควรอ้างสำหรับคำถามที่ระบบไม่เคยเห็นคือ <span className="font-medium text-foreground">รอบแรกแบบ blind</span> ·
+        ชุด golden ใช้ปรับจูนระบบจึงสูงเกินจริงโดยธรรมชาติ · ยังไม่มีเฉลยที่ผู้เชี่ยวชาญรับรอง
+      </p>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ชุด</TableHead><TableHead className="text-right">คำถาม</TableHead><TableHead className="text-right">Hit@6</TableHead>
+            <TableHead className="text-right">พฤติกรรมถูก</TableHead><TableHead className="text-right">ข้อเท็จจริงถูก</TableHead><TableHead className="text-right">รั่วไหล</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r) => (
+            <TableRow key={r.key} className={cn(r.blind && "bg-brand/5")}>
+              <TableCell className={cn(r.blind && "font-medium")}>{r.label}</TableCell>
+              <TableCell className="text-right tabular-nums">{r.questions}</TableCell>
+              <TableCell className="text-right tabular-nums">{pct(r.hit6)}</TableCell>
+              <TableCell className="text-right tabular-nums">{pct(r.behaviour)}</TableCell>
+              <TableCell className="text-right tabular-nums">{pct(r.key_facts)}</TableCell>
+              <TableCell className="text-right tabular-nums">{r.leakage ?? "–"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
+  );
+}
+
 export default function EvalPage() {
   const [ev, setEv] = useState<EvalData | null>(null);
+  const [sets, setSets] = useState<SetRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { api<EvalData>("/eval/latest").then(setEv).catch((e) => setErr(e.message)); }, []);
+  useEffect(() => {
+    api<EvalData>("/eval/latest").then(setEv).catch((e) => setErr(e.message));
+    api<SetRow[]>("/eval/sets").then(setSets).catch(() => setSets([]));
+  }, []);
 
   const best = ev?.retrieval_ablation?.at(-1);
   const base = ev?.retrieval_ablation?.[0];
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Evaluation" description="วัดคุณภาพด้วย golden set ที่ตรวจด้วยกฎตายตัว (evidence string / key facts) — ไม่พึ่ง LLM เป็นผู้ตัดสิน" />
-      <div className="flex-1 overflow-y-auto">
+      <PageHeader title="Evaluation" description="วัดคุณภาพด้วยชุดคำถามที่ตรวจด้วยกฎตายตัว (evidence string / key facts) — ไม่พึ่ง LLM เป็นผู้ตัดสิน" />
+      <div tabIndex={0} className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl space-y-6 px-4 py-4 md:px-8 md:py-6">
           {err && <p className="text-sm text-muted-foreground">{err}</p>}
           {!ev && !err && <Skeleton className="h-64" />}
+          {sets && sets.length > 0 && <AllSets rows={sets} />}
           {ev && (
             <>
+              <h2 className="pt-2 font-medium">รายละเอียดชุด golden (ใช้ปรับจูน)</h2>
               <p className="text-xs text-muted-foreground">รันเมื่อ {new Date(ev.created_at).toLocaleString("th-TH")} · golden set {ev.n_questions} คำถาม</p>
               {best && base && (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -76,7 +118,7 @@ export default function EvalPage() {
 
               {ev.retrieval_ablation && (
                 <div className="panel p-5">
-                  <h3 className="font-medium">Retrieval ablation</h3>
+                  <h2 className="font-medium">Retrieval ablation</h2>
                   <p className="mb-4 text-xs text-muted-foreground">แต่ละขั้นของ pipeline ช่วยอะไร — วัดบนคำถามที่ตอบได้ ด้วย top-6 context</p>
                   <div className="space-y-3">
                     {ev.retrieval_ablation.map((r, i) => (
@@ -113,8 +155,8 @@ export default function EvalPage() {
 
               {ev.end_to_end ? (
                 <div className="panel p-5">
-                  <h3 className="font-medium">End-to-end (โมเดล {ev.end_to_end.model})</h3>
-                  {ev.end_to_end.stopped_early && <p className="mt-1 text-xs text-amber-600">หยุดก่อนครบ: {ev.end_to_end.stopped_early}</p>}
+                  <h2 className="font-medium">End-to-end (โมเดล {ev.end_to_end.model})</h2>
+                  {ev.end_to_end.stopped_early && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">หยุดก่อนครบ: {ev.end_to_end.stopped_early}</p>}
                   <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {Object.entries(ev.end_to_end.summary).map(([k, v]) => (
                       <div key={k} className="rounded-lg bg-muted/50 p-3">

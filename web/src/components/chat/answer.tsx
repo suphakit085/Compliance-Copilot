@@ -18,13 +18,23 @@ import { ReportDialog } from "@/components/chat/report-dialog";
 
 const STATUS: Record<Status, { label: string; className: string; icon: React.ElementType }> = {
   answered: { label: "ตอบจากแหล่งอ้างอิงที่ตรวจสอบแล้ว", className: "bg-emerald-600/10 text-emerald-700 dark:text-emerald-400", icon: CheckCircle2 },
-  partial: { label: "ตอบได้บางส่วน", className: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: CircleHelp },
+  partial: { label: "ตอบได้บางส่วน", className: "bg-amber-500/15 text-amber-800 dark:text-amber-400", icon: CircleHelp },
   insufficient_evidence: { label: "ไม่พบหลักฐานเพียงพอ", className: "bg-muted text-muted-foreground", icon: SearchX },
   out_of_scope: { label: "นอกขอบเขต", className: "bg-muted text-muted-foreground", icon: Ban },
   blocked: { label: "ถูกบล็อกโดย guardrail", className: "bg-red-600/10 text-red-700 dark:text-red-400", icon: ShieldAlert },
   retrieval_only: { label: "แสดงข้อความต้นฉบับ (ไม่มีคำตอบจาก AI)", className: "bg-sky-500/10 text-sky-700 dark:text-sky-400", icon: SearchX },
   unverified: { label: "ยืนยันแหล่งอ้างอิงไม่ได้", className: "bg-red-600/10 text-red-700 dark:text-red-400", icon: AlertTriangle },
 };
+
+const SYNTHETIC = " เป็นเอกสารจำลองเพื่อการสาธิต (ไม่ใช่นโยบายจริง)";
+
+/** One notice per synthetic document took half a phone screen; say it once and list them. */
+function groupNotices(notices: string[]): string[] {
+  const synthetic = notices.filter((n) => n.endsWith(SYNTHETIC)).map((n) => n.slice(0, -SYNTHETIC.length));
+  const rest = notices.filter((n) => !n.endsWith(SYNTHETIC));
+  if (synthetic.length < 2) return notices;
+  return [...rest, `เอกสารจำลองเพื่อการสาธิต (ไม่ใช่นโยบายจริง): ${synthetic.join(", ")}`];
+}
 
 export function Answer({
   r, verified, activeSource, onCite, onFollowUp,
@@ -57,7 +67,7 @@ export function Answer({
           <Badge variant="outline">อ้างอิงที่ยืนยันได้ {g.markers_supported}/{g.markers}</Badge>
         )}
         {Object.keys(r.pii_masked ?? {}).length > 0 && (
-          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400">
+          <Badge className="bg-amber-500/15 text-amber-800 dark:text-amber-400">
             <EyeOff /> ปิดบังข้อมูลส่วนบุคคล: {Object.entries(r.pii_masked).map(([k, v]) => `${k}×${v}`).join(", ")}
           </Badge>
         )}
@@ -80,8 +90,8 @@ export function Answer({
                     onClick={() => onCite(id)}
                     title={ok ? "ดูข้อความต้นฉบับที่อ้างอิง" : "อ้างอิงนี้ยืนยันกับต้นฉบับไม่ได้"}
                     className={cn(
-                      "mx-0.5 inline-flex -translate-y-0.5 items-center rounded px-1 text-[0.7rem] font-semibold transition",
-                      ok ? "bg-brand/15 text-[#4db8ff] hover:bg-brand/25" : "bg-red-600/15 text-red-400",
+                      "mx-0.5 inline-flex min-h-6 min-w-6 -translate-y-0.5 items-center justify-center rounded px-1 text-[0.7rem] font-semibold transition",
+                      ok ? "bg-brand/15 text-brand-strong hover:bg-brand/25" : "bg-red-600/15 text-red-700 dark:text-red-400",
                       activeSource === id && "ring-1 ring-brand shadow-[0_0_10px_rgba(0,153,255,0.5)]",
                     )}
                   >
@@ -89,7 +99,7 @@ export function Answer({
                   </button>
                 );
               }
-              return <a href={href} target="_blank" rel="noreferrer" className="text-primary underline">{children}</a>;
+              return <a href={href} target="_blank" rel="noreferrer" className="text-brand-strong underline">{children}</a>;
             },
           }}
         >
@@ -112,7 +122,7 @@ export function Answer({
         </a>
       )}
 
-      {r.notices.map((n) => (
+      {groupNotices(r.notices).map((n) => (
         <div key={n} className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" /> {n}
         </div>
@@ -124,7 +134,7 @@ export function Answer({
             <button
               key={q}
               onClick={() => onFollowUp(q)}
-              className="rounded-full border bg-secondary/60 px-3 py-1 text-xs text-muted-foreground transition hover:border-brand/40 hover:text-foreground"
+              className="rounded-2xl border bg-secondary/60 px-3 py-1.5 text-left text-xs text-muted-foreground transition hover:border-brand/40 hover:text-foreground"
             >
               {q}
             </button>

@@ -15,7 +15,7 @@ const STEPS = [
 ];
 
 const STATUS: Record<string, { label: string; icon: React.ElementType; cls: string }> = {
-  open: { label: "รอดำเนินการ", icon: Clock, cls: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
+  open: { label: "รอดำเนินการ", icon: Clock, cls: "bg-amber-500/15 text-amber-800 dark:text-amber-400" },
   resolved: { label: "แก้ไขแล้ว", icon: CheckCircle2, cls: "bg-emerald-600/10 text-emerald-700 dark:text-emerald-400" },
   dismissed: { label: "ปิดเรื่อง", icon: CheckCircle2, cls: "bg-muted text-muted-foreground" },
 };
@@ -27,14 +27,14 @@ export default function HelpPage() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="คู่มือการใช้งาน" description="ใช้ให้ถูกวิธี อ่านผลให้เป็น และรายงานเมื่อพบปัญหา" />
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div tabIndex={0} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-8 px-4 py-6 md:px-8">
           <section className="space-y-3">
             <h2 className="flex items-center gap-2 text-base font-semibold"><LifeBuoy className="size-4 text-brand" /> 5 ข้อก่อนเชื่อคำตอบ</h2>
             <ol className="space-y-2.5">
               {STEPS.map((s, i) => (
                 <li key={s.t} className="panel flex gap-3 p-3.5">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand/15 text-xs font-semibold text-[#4db8ff]">{i + 1}</span>
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand/15 text-xs font-semibold text-brand-strong">{i + 1}</span>
                   <span><span className="text-sm font-medium">{s.t}</span><span className="mt-0.5 block text-sm text-muted-foreground">{s.d}</span></span>
                 </li>
               ))}

@@ -66,7 +66,7 @@ export default function ReportsPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   {r.category === "leak" && <Siren className="size-4 text-red-500" />}
                   <Badge variant="outline">{REPORT_CATEGORIES.find((c) => c.value === r.category)?.label ?? r.category}</Badge>
-                  <Badge className={r.report_status === "open" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400" : "bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"}>
+                  <Badge className={r.report_status === "open" ? "bg-amber-500/15 text-amber-800 dark:text-amber-400" : "bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"}>
                     {r.report_status === "open" ? "รอดำเนินการ" : r.report_status === "resolved" ? "แก้ไขแล้ว" : "ปิดเรื่อง"}
                   </Badge>
                   <span className="ml-auto text-xs text-muted-foreground">

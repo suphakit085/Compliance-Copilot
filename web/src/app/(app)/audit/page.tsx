@@ -83,7 +83,7 @@ export default function AuditPage() {
               <button
                 key={e}
                 onClick={() => setEvent(e)}
-                className={cn("rounded-full border px-3 py-1 text-xs", event === e ? "border-primary bg-brand/15 text-[#4db8ff]" : "text-muted-foreground hover:bg-muted")}
+                className={cn("rounded-full border px-3 py-1 text-xs", event === e ? "border-primary bg-brand/15 text-brand-strong" : "text-muted-foreground hover:bg-muted")}
               >
                 {e}
               </button>
@@ -119,7 +119,7 @@ export default function AuditPage() {
             </Table>
           </div>
         </div>
-        <aside className="hidden w-[440px] shrink-0 overflow-y-auto border-l bg-muted/30 p-5 xl:block">
+        <aside aria-label="รายละเอียดรายการ" tabIndex={0} className="hidden w-[440px] shrink-0 overflow-y-auto border-l bg-muted/30 p-5 xl:block">
           {selected && (
             <div className="space-y-3">
               <div className="text-sm font-medium">รายการ #{selected.id} · {selected.event}</div>
@@ -127,7 +127,7 @@ export default function AuditPage() {
                 <div>prev: {selected.prev_hash}</div>
                 <div>hash: {selected.hash}</div>
               </div>
-              <pre className="max-h-[70vh] overflow-auto rounded-lg bg-card p-3 text-[0.7rem] leading-relaxed">
+              <pre tabIndex={0} className="max-h-[70vh] overflow-auto rounded-lg bg-card p-3 text-[0.7rem] leading-relaxed">
                 {JSON.stringify(selected.payload, null, 2)}
               </pre>
             </div>

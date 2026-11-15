@@ -42,14 +42,13 @@ export const SourceCard = forwardRef<HTMLDivElement, { source: Source; active: b
         className={cn(
           "cursor-pointer rounded-[14px] border bg-card p-4 transition-all",
           active ? "border-brand/60 shadow-[0_0_24px_rgba(0,153,255,0.18)]" : "hover:border-white/15",
-          !s.cited && !active && "opacity-80",
         )}
       >
         <div className="mb-2 flex items-start gap-2">
           <span
             className={cn(
               "mt-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold",
-              s.cited ? "bg-brand text-white shadow-[0_0_10px_rgba(0,153,255,0.6)]" : "bg-muted text-muted-foreground",
+              s.cited ? "bg-primary text-primary-foreground shadow-[0_0_10px_rgba(0,153,255,0.6)]" : "bg-muted text-muted-foreground",
             )}
           >
             {s.id}
@@ -67,7 +66,7 @@ export const SourceCard = forwardRef<HTMLDivElement, { source: Source; active: b
             <Badge className="bg-red-600/10 text-red-700 dark:text-red-400"><Lock /> ลับ</Badge>
           )}
           {s.extraction === "ocr" && (
-            <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400"><FileScan /> OCR</Badge>
+            <Badge className="bg-amber-500/15 text-amber-800 dark:text-amber-400"><FileScan /> OCR</Badge>
           )}
           {s.synthetic && (
             <Badge className="bg-violet-500/10 text-violet-700 dark:text-violet-400"><FlaskConical /> เอกสารจำลอง</Badge>
@@ -89,12 +88,12 @@ export const SourceCard = forwardRef<HTMLDivElement, { source: Source; active: b
         {active && (s.official_url || s.source_url) && (
           <div className="mt-3 flex flex-wrap gap-3 text-xs">
             {s.official_url && (
-              <a href={s.official_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+              <a href={s.official_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand-strong hover:underline">
                 แหล่งทางการ <ExternalLink className="size-3" />
               </a>
             )}
             {s.source_url && s.source_url !== s.official_url && (
-              <a href={s.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+              <a href={s.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand-strong hover:underline">
                 ไฟล์ที่ใช้ <ExternalLink className="size-3" />
               </a>
             )}

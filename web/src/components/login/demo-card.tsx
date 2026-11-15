@@ -93,7 +93,7 @@ export function DemoCard() {
             <div key={i} className="enter space-y-2" style={{ ["--d" as string]: "0ms" }}>
               <p className="leading-relaxed">
                 {ex.a}{" "}
-                <span className="rounded bg-brand/15 px-1 text-[0.7rem] font-semibold text-[#4db8ff]">S1</span>
+                <span className="rounded bg-brand/15 px-1 text-[0.7rem] font-semibold text-brand-strong">S1</span>
               </p>
               <div className="rounded-lg border border-brand/25 bg-brand/[0.06] px-3 py-2 text-xs">
                 <div className="mb-1 font-medium text-foreground/90">{ex.cite}</div>
