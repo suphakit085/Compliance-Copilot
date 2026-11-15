@@ -22,3 +22,6 @@ eval/results/eval-*.json
 deploy/secrets/*
 !deploy/secrets/.gitkeep
 backups/
+
+# UI audit tooling and output (scripts/ui-audit.mjs)
+.ui-audit/

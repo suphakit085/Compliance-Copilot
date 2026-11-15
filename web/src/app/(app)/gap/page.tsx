@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 const STATUS: Record<string, { label: string; icon: React.ElementType; className: string; ring: string }> = {
   conflict: { label: "ขัดแย้งกับกฎ", icon: CircleX, className: "text-red-600", ring: "border-red-500/40 bg-red-500/5" },
   partial: { label: "ไม่ครบถ้วน", icon: CircleAlert, className: "text-orange-600", ring: "border-orange-500/40 bg-orange-500/5" },
-  needs_review: { label: "ต้องทบทวน", icon: OctagonAlert, className: "text-amber-600", ring: "border-amber-500/40 bg-amber-500/5" },
+  needs_review: { label: "ต้องทบทวน", icon: OctagonAlert, className: "text-amber-700 dark:text-amber-400", ring: "border-amber-500/40 bg-amber-500/5" },
   compliant: { label: "สอดคล้อง", icon: CheckCircle2, className: "text-emerald-600", ring: "" },
   not_applicable: { label: "ไม่เกี่ยวข้อง", icon: CircleDashed, className: "text-muted-foreground", ring: "" },
   not_covered: { label: "ไม่มีกฎที่เกี่ยวข้องในคลัง", icon: CircleDashed, className: "text-muted-foreground", ring: "" },
@@ -64,6 +64,7 @@ export default function GapPage() {
       >
         <div className="flex items-center gap-2">
           <select
+            aria-label="นโยบายที่จะวิเคราะห์"
             value={policy}
             onChange={(e) => setPolicy(e.target.value)}
             className="h-8 rounded-lg border bg-background px-2 text-sm"

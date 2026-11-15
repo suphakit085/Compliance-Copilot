@@ -144,7 +144,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <UserContext.Provider value={user}>
       <TermsGate user={user} onAccepted={setUser} />
       <div className="flex h-dvh overflow-hidden">
-        <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
+        <aside aria-label="เมนูหลัก" className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
           {sidebar}
         </aside>
 

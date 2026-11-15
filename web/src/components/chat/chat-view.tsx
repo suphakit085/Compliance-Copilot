@@ -103,7 +103,7 @@ function Composer({
         }}
         rows={big ? 3 : 1}
         placeholder="ถามเรื่องกฎหมาย ประกาศ หรือนโยบายภายใน…"
-        className="block max-h-40 w-full resize-none bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-muted-foreground/70 sm:text-[15px]"
+        className="block max-h-40 w-full resize-none bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-muted-foreground sm:text-[15px]"
       />
       <div className="mt-2 flex items-center justify-between gap-2">
         <label
@@ -298,6 +298,7 @@ export function ChatView({ conversationId }: { conversationId?: string }) {
         {empty && <div className="aurora pointer-events-none absolute inset-x-0 top-0 h-[520px]" />}
 
         <div className="relative flex items-center justify-between px-4 py-3 md:px-8 md:py-4">
+          {!empty && <h1 className="sr-only">ถาม-ตอบ</h1>}
           <div className="text-sm text-muted-foreground">
             {user ? `สวัสดี ${user.display_name.split(" ")[0]}` : " "}
           </div>
@@ -411,9 +412,10 @@ export function ChatView({ conversationId }: { conversationId?: string }) {
         )}
       </div>
 
-      <aside className="hidden w-[420px] shrink-0 flex-col border-l bg-sidebar xl:flex">
+      <aside aria-label="แหล่งอ้างอิง" className="hidden w-[420px] shrink-0 flex-col border-l bg-sidebar xl:flex">
         <div className="flex items-center gap-2 border-b px-5 py-4 text-sm font-medium">{sourcesHeader}</div>
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">{renderSources("panel")}</div>
+        {/* focusable so keyboard users can scroll the passages (2.1.1) */}
+        <div tabIndex={0} className="flex-1 space-y-3 overflow-y-auto p-4">{renderSources("panel")}</div>
       </aside>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

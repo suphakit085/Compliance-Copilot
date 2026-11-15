@@ -43,6 +43,7 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
   --color-success: var(--success);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -53,16 +54,20 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Contrast (WCAG 2.1 AA, checked with axe-core): --brand is for icons, bars and tints; text in
+   the brand colour uses --brand-strong; filled buttons use --primary, which carries white text at
+   4.8:1 (the original #0099ff gave 3.0:1). */
 :root {
-  --brand: #0099ff;
-  --success: #00bb88;
+  --brand: #0073cf;
+  --brand-strong: #0062b8;
+  --success: #007a55; /* #00bb88 is 2.5:1 on white */
   --background: #ffffff;
   --foreground: #0a0a0a;
   --card: #ffffff;
   --card-foreground: #0a0a0a;
   --popover: #ffffff;
   --popover-foreground: #0a0a0a;
-  --primary: #0099ff;
+  --primary: #0073cf;
   --primary-foreground: #ffffff;
   --secondary: #f4f4f5;
   --secondary-foreground: #0a0a0a;
@@ -91,13 +96,16 @@
 }
 
 .dark {
+  --brand: #0099ff;
+  --brand-strong: #4db8ff;
+  --success: #00bb88;
   --background: #000000;
   --foreground: #ffffff;
   --card: #111111;
   --card-foreground: #ffffff;
   --popover: #141414;
   --popover-foreground: #ffffff;
-  --primary: #0099ff;
+  --primary: #0073cf;
   --primary-foreground: #ffffff;
   --secondary: #1e1e1e;
   --secondary-foreground: #ffffff;
@@ -342,4 +350,12 @@
   40% { transform: translateX(7px); }
   60% { transform: translateX(-5px); }
   80% { transform: translateX(3px); }
+}
+
+/* A focus indicator everyone can see (WCAG 2.4.7): the default was a 1px outline at ~27% opacity.
+   Unlayered on purpose, so component utilities cannot fade it again. The question box has its own
+   glowing focus state. */
+:where(a, button, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-strong);
+  outline-offset: 2px;
 }

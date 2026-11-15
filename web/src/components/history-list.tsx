@@ -79,7 +79,7 @@ export function HistoryList({ onNavigate }: { onNavigate?: () => void }) {
         )}
         {items && groupByDay(items).map((g) => (
           <div key={g.label} className="pb-2">
-            <p className="px-3 pb-1 pt-2 text-[10.5px] font-medium text-muted-foreground/60">{g.label}</p>
+            <p className="px-3 pb-1 pt-2 text-[10.5px] font-medium text-muted-foreground">{g.label}</p>
             {g.items.map((c) => {
           const active = pathname === `/c/${c.id}`;
           return (
@@ -111,7 +111,7 @@ export function HistoryList({ onNavigate }: { onNavigate?: () => void }) {
                   >
                     <MessageSquare className="size-3.5 shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{c.title}</span>
-                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                       {timeLabel(c.updated_at)}
                     </span>
                   </Link>

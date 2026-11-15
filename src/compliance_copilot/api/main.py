@@ -716,6 +716,40 @@ def health() -> dict[str, Any]:
     }
 
 
+_EVAL_SETS = [
+    # (key, label, file, tuned on it?, first run before any fix?)
+    ("main", "Golden set (ใช้ปรับจูนระบบ)", "latest.json", True, False),
+    ("holdout_blind", "Held-out — รอบแรกแบบ blind", "holdout-blind-run1.json", False, True),
+    ("extended_blind", "Extended — รอบแรกแบบ blind", "extended-blind-run1.json", False, True),
+    ("holdout", "Held-out — หลังแก้ (ไม่ blind แล้ว)", "latest-holdout.json", False, False),
+    ("extended", "Extended — หลังแก้ (ไม่ blind แล้ว)", "latest-extended.json", False, False),
+]
+
+
+@app.get("/eval/sets", tags=["ops"])
+def eval_sets(user: Annotated[UserContext, Depends(current_user)]) -> list[dict[str, Any]]:
+    """Every question set side by side, so the tuned set's 100% is never shown without the
+    numbers for questions the system had not seen."""
+    out = []
+    for key, label, fn, tuned, blind in _EVAL_SETS:
+        f = ROOT / "eval" / "results" / fn
+        if not f.exists():
+            continue
+        d = json.loads(f.read_text(encoding="utf-8"))
+        prod = (d.get("retrieval_ablation") or [{}])[-1]
+        e2e = (d.get("end_to_end") or {}).get("summary") or {}
+        if key == "extended_blind" and not e2e and (g := ROOT / "eval" / "results" / "extended-e2e-as-run.json").exists():
+            # the blind retrieval run had no answers; its first end-to-end run is stored as run
+            e2e = (json.loads(g.read_text(encoding="utf-8")).get("end_to_end") or {}).get("summary") or {}
+        out.append({
+            "key": key, "label": label, "tuned": tuned, "blind": blind, "questions": d.get("n_questions"),
+            "created_at": d.get("created_at"), "hit6": prod.get("hit@6"), "leakage": prod.get("leakage"),
+            "behaviour": e2e.get("behaviour_accuracy"), "key_facts": e2e.get("key_fact_accuracy"),
+            "reviewed": (d.get("review") or {}).get("reviewed", 0),
+        })
+    return out
+
+
 @app.get("/eval/latest", tags=["ops"])
 def eval_latest(user: Annotated[UserContext, Depends(current_user)]) -> dict[str, Any]:
     f = ROOT / "eval" / "results" / "latest.json"

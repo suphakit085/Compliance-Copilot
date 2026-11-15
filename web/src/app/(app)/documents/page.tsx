@@ -25,6 +25,8 @@ export default function DocumentsPage() {
       setDocs(d);
       setActive(d.find((x) => x.id === params.get("doc"))?.id ?? d[0]?.id ?? null);
       if (params.get("view") === "summary") setView("summary");
+      // a deep-linked document may be far down the list (on a phone the list is a short strip)
+      setTimeout(() => document.getElementById(`doc-${params.get("doc")}`)?.scrollIntoView({ block: "nearest" }), 50);
     });
   }, []);
 
@@ -64,6 +66,8 @@ export default function DocumentsPage() {
                 {docs.filter((d) => d.source_kind === g.key).map((d) => (
                   <button
                     key={d.id}
+                    id={`doc-${d.id}`}
+                    aria-current={active === d.id ? "true" : undefined}
                     onClick={() => { setActive(d.id); setSections(null); setQ(""); setOpen(null); }}
                     className={cn(
                       "w-full rounded-lg px-3 py-2.5 text-left transition",
@@ -95,7 +99,7 @@ export default function DocumentsPage() {
                   <Badge variant="outline">มีผล {doc.effective_from}{doc.effective_to ? ` → ${doc.effective_to}` : ""}</Badge>
                   {doc.classification === "confidential" && <Badge className="bg-red-600/10 text-red-700"><Lock /> ลับ</Badge>}
                   {doc.synthetic && <Badge className="bg-violet-500/10 text-violet-700 dark:text-violet-400"><FlaskConical /> เอกสารจำลองเพื่อการสาธิต</Badge>}
-                  {!!doc.quality?.ocr_pages?.length && <Badge className="bg-amber-500/15 text-amber-700"><FileScan /> OCR หน้า {doc.quality.ocr_pages.join(", ")}</Badge>}
+                  {!!doc.quality?.ocr_pages?.length && <Badge className="bg-amber-500/15 text-amber-800 dark:text-amber-400"><FileScan /> OCR หน้า {doc.quality.ocr_pages.join(", ")}</Badge>}
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
@@ -118,7 +122,7 @@ export default function DocumentsPage() {
                     <span
                       className={cn(
                         doc.governance.review_state === "overdue" && "font-medium text-red-600 dark:text-red-400",
-                        doc.governance.review_state === "due_soon" && "font-medium text-amber-600 dark:text-amber-400",
+                        doc.governance.review_state === "due_soon" && "font-medium text-amber-700 dark:text-amber-400",
                       )}
                     >
                       <span className="font-normal text-muted-foreground">ทบทวนภายใน </span>
@@ -141,7 +145,7 @@ export default function DocumentsPage() {
                 ))}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   {doc.official_ref && <span>อ้างอิงทางการ: {doc.official_ref}</span>}
-                  {doc.official_url && <a className="inline-flex items-center gap-1 text-primary hover:underline" href={doc.official_url} target="_blank" rel="noreferrer">แหล่งทางการ <ExternalLink className="size-3" /></a>}
+                  {doc.official_url && <a className="inline-flex items-center gap-1 text-brand-strong hover:underline" href={doc.official_url} target="_blank" rel="noreferrer">แหล่งทางการ <ExternalLink className="size-3" /></a>}
                   {doc.source_name && <span>ไฟล์จาก: {doc.source_name}</span>}
                   {doc.sha256 && <span className="font-mono">sha256 {doc.sha256.slice(0, 16)}…</span>}
                 </div>
@@ -175,7 +179,7 @@ export default function DocumentsPage() {
                 {shown.map((s) => (
                   <div key={s.id} id={`unit-${s.id}`}>
                     <button onClick={() => setOpen(open === s.id ? null : s.id)} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted/50">
-                      <span className="mt-0.5 shrink-0 rounded-md bg-brand/15 px-2 py-0.5 text-xs font-semibold text-[#4db8ff]">{s.label}</span>
+                      <span className="mt-0.5 shrink-0 rounded-md bg-brand/15 px-2 py-0.5 text-xs font-semibold text-brand-strong">{s.label}</span>
                       <span className={cn("min-w-0 text-sm text-foreground/80", open !== s.id && "line-clamp-1")}>
                         {s.title ?? s.text.replace(s.label, "").slice(0, 160)}
                       </span>
