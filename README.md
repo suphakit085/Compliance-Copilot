@@ -42,6 +42,12 @@ citation is *checked against the source text by code* before it is shown.
 - **Streaming answers** — real progress, the retrieved sources after about a second and the answer
   text as it is written (labelled as an unverified draft); the verified answer, with citations
   checked against the originals, replaces it at the end.
+- **Whole-document summaries** — "summarise this notification" is not answered from six retrieved
+  passages: the model reads every unit (long documents in parts), and each key point must quote the
+  unit it comes from; points whose quote is not found are dropped. Summaries are grouped (scope,
+  obligations, deadlines, prohibitions, penalties, exceptions, commencement), stored per document
+  version, marked stale when the text changes, and signed off by a compliance officer. Chat recognises
+  such requests and links to the full summary.
 - **Time-aware answers** — "what was the gift limit as of June 2024?" retrieves the policy
   version in force on that date; pending amendments (e.g. SEC ทธ. 53/2568 amending
   ทธ. 35/2556) are surfaced as warnings.

@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     rate_user_per_min: int = 300
     rate_chat_per_min: int = 20  # each answer is an LLM call
     rate_gap_per_10min: int = 5  # a gap analysis is dozens of LLM calls
+    rate_summary_per_10min: int = 5  # a document summary reads the whole document
     rate_login_ip_per_min: int = 20  # per client address, across all usernames
     # Trust X-Forwarded-For for the client address. Only enable behind a proxy you control.
     trust_proxy: bool = False

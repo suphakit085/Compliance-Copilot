@@ -24,7 +24,7 @@ from .. import __version__, audit, governance, history, llm, observability, sso,
 from .. import feedback as feedback_mod
 from ..config import ROOT, get_settings
 from ..db import AuditLog, Chunk, Document, Feedback, User, as_reader, engine, init_db, session
-from ..features import gap_analysis
+from ..features import doc_summary, gap_analysis
 from ..generation.answerer import ChatResponse, answer_question, stream_answer
 from ..guardrails.pii import mask_pii
 from ..ingestion.updates import read_lock
@@ -545,6 +545,66 @@ def sections(doc_id: str, user: Annotated[UserContext, Depends(current_user)]) -
              "pages": [c.page_start, c.page_end], "notes": c.notes, "extraction": c.extraction}
             for c in rows
         ]
+
+
+# ------------------------------------------------------------------ document summary
+
+
+def _summary_errors(fn):
+    try:
+        return fn()
+    except LookupError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
+    except doc_summary.SummaryError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
+    except llm.QuotaExceeded as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "โควตา LLM ของวันนี้หมดแล้ว ลองใหม่พรุ่งนี้") from e
+    except llm.LLMError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "สร้างสรุปไม่สำเร็จ ลองใหม่ภายหลัง") from e
+
+
+@app.get("/documents/{doc_id}/summary", tags=["documents"])
+def get_summary(doc_id: str, user: Annotated[UserContext, Depends(current_user)]) -> dict[str, Any]:
+    """The stored summary (``summary`` is null when none has been made yet)."""
+    return {"summary": _summary_errors(lambda: doc_summary.get(doc_id, user))}
+
+
+class SummaryIn(BaseModel):
+    force: bool = False  # write a new summary even if one exists for the current text
+
+
+@app.post("/documents/{doc_id}/summary", tags=["documents"])
+def make_summary(
+    doc_id: str, body: SummaryIn,
+    user: Annotated[UserContext, Depends(limited("summary", "rate_summary_per_10min", 600))],
+) -> dict[str, Any]:
+    """Summarise the whole document. Anyone who can read it may create the first summary (it is
+    then shared); replacing an existing one is for compliance officers."""
+    if body.force and user.role not in ROLES_GAP:
+        audit.log_event("access_denied", {"required": sorted(ROLES_GAP), "action": "summary_regenerate"}, user)
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "เฉพาะเจ้าหน้าที่ Compliance สร้างสรุปใหม่แทนฉบับเดิมได้")
+    if not llm.available():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "LLM is not configured")
+    return {"summary": _summary_errors(lambda: doc_summary.generate(doc_id, user, force=body.force))}
+
+
+class SummaryReviewIn(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@app.post("/documents/{doc_id}/summary/review", tags=["documents"])
+def review_summary(
+    doc_id: str, body: SummaryReviewIn, user: Annotated[UserContext, Depends(require(ROLES_GAP))]
+) -> dict[str, Any]:
+    return {"summary": _summary_errors(lambda: doc_summary.review(doc_id, user, body.note))}
+
+
+@app.get("/documents/{doc_id}/summary/markdown", response_class=PlainTextResponse, tags=["documents"])
+def summary_markdown(doc_id: str, user: Annotated[UserContext, Depends(current_user)]) -> str:
+    s = _summary_errors(lambda: doc_summary.get(doc_id, user))
+    if not s:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no summary yet")
+    return doc_summary.to_markdown(s)
 
 
 # ---------------------------------------------------------------------- gap analysis

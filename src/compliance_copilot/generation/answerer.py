@@ -71,6 +71,9 @@ class ChatResponse(BaseModel):
     guard_flags: list[str] = []
     grounding: dict[str, Any] = {}
     trace: dict[str, Any] = {}
+    # Set when the question asks to summarise a whole document: this answer reads only a few
+    # units, so the UI points to the full, verified document summary instead.
+    summary_hint: dict[str, Any] | None = None
 
 
 NO_EVIDENCE = (
@@ -261,6 +264,7 @@ def stream_answer(
     base = dict(
         sources=sources, notices=retrieval.notices, standalone_question=standalone,
         as_of=as_of.isoformat(), pii_masked=dict(masked.found), guard_flags=guard.flags,
+        summary_hint=_summary_hint(standalone, user),
     )
 
     # 4. Abstain when the best evidence is weak - no LLM call, nothing to hallucinate from
@@ -347,6 +351,15 @@ def stream_answer(
         grounding=grounding, trace={**trace, "llm": usage_total.__dict__}, **base,
     )
     yield {"type": "final", "response": _finish(resp, q, retrieval, usage_total, started, user, log)}
+
+
+def _summary_hint(question: str, user: UserContext) -> dict[str, Any] | None:
+    from ..features.doc_summary import whole_document_request
+
+    try:
+        return whole_document_request(question, user)
+    except Exception:  # a hint must never break an answer
+        return None
 
 
 def _add(a: llm.Usage, b: llm.Usage) -> llm.Usage:

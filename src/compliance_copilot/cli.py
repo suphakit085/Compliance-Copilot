@@ -186,6 +186,38 @@ def gap(policy: str, user: str = "nida", out: Annotated[str | None, typer.Option
         console.print(md)
 
 
+@app.command()
+def summarize(
+    documents: Annotated[list[str] | None, typer.Argument(help="Document ids (default: every document)")] = None,
+    user: str = "nida",
+    force: Annotated[bool, typer.Option("--force", help="Write a new summary even if one is current")] = False,
+    out: Annotated[str | None, typer.Option(help="Write Markdown (one document only)")] = None,
+) -> None:
+    """Summarise whole documents (key points with verified quotes) and store them."""
+    from sqlalchemy import select
+
+    from .db import Document, User, session
+    from .features import doc_summary
+    from .security import to_context
+
+    with session() as db:
+        ctx = to_context(db.execute(select(User).where(User.username == user)).scalar_one())
+        ids = documents or list(db.execute(select(Document.id).order_by(Document.id)).scalars())
+    for doc_id in ids:
+        try:
+            s = doc_summary.generate(doc_id, ctx, force=force)
+        except (LookupError, doc_summary.SummaryError) as e:
+            console.print(f"[red]{doc_id}: {e}[/red]")
+            continue
+        st = s["stats"]
+        console.print(f"{doc_id}: {st['points']} points, {st['units_cited']}/{st['units']} units cited, "
+                      f"dropped {st['dropped_points']} unverifiable, {st['elapsed_s']}s")
+        if out and len(ids) == 1:
+            with open(out, "w", encoding="utf-8") as f:
+                f.write(doc_summary.to_markdown(s))
+            console.print(f"wrote {out}")
+
+
 @app.command("eval")
 def evaluate(
     retrieval: bool = True,

@@ -120,6 +120,19 @@ Unverifiable citations are dropped and their markers rendered red; if nothing ve
 the user sees the source passages instead of the generated text. This works with any LLM
 (Gemini, Claude, an on-prem model) and turns "faithfulness" into a deterministic metric.
 
+### Whole-document summaries are not chat answers
+Chat reads the six best-ranked units, which is right for a question and misleading for "summarise
+this Act" — the answer looks complete while covering a few percent of the text. Summaries
+(`features/doc_summary.py`) therefore skip retrieval: the model reads every unit, numbered `U1..Un`,
+and each key point must carry a quote from a named unit, verified by the same code as chat
+citations; points without one are dropped and counted. Documents are read in parts of at most
+24,000 characters: one 80,000-character request produced 11–16 points citing 11–16 of PDPA's 114
+units, parts produced 41 points citing 35. Results are stored with a fingerprint of the unit texts
+(one model run per version, shared by everyone who may read the document, readable only under the
+same row-level security), flagged stale when the text changes, and can be signed off by a
+compliance officer only while current. Chat detects "summarise <one named document>" and links to
+the summary instead of pretending.
+
 ### Abstain before generating
 If the best reranker score is below a threshold calibrated on the golden set, the system
 answers "insufficient evidence" without calling the LLM — cheaper, faster, and nothing to

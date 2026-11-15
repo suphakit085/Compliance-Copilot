@@ -194,6 +194,25 @@ class ConversationMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class DocumentSummary(Base):
+    """Whole-document summary (features/doc_summary.py). Rows are never updated except for the
+    sign-off; a new version of the document gets a new row, so earlier summaries stay traceable."""
+
+    __tablename__ = "document_summaries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))  # sha256 of the units it was written from
+    prompt_version: Mapped[str] = mapped_column(String(30))
+    model: Mapped[str | None] = mapped_column(String(80))
+    summary: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_by: Mapped[str] = mapped_column(String(60))
+    reviewed_by: Mapped[str | None] = mapped_column(String(60))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text)
+
+
 class EvalRun(Base):
     __tablename__ = "eval_runs"
 
@@ -256,6 +275,12 @@ DROP POLICY IF EXISTS chunk_visibility ON chunks;
 CREATE POLICY chunk_visibility ON chunks FOR SELECT TO {READER_ROLE} USING (
   EXISTS (SELECT 1 FROM documents d WHERE d.id = chunks.document_id)
 );
+GRANT SELECT ON document_summaries TO {READER_ROLE};
+ALTER TABLE document_summaries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS summary_visibility ON document_summaries;
+CREATE POLICY summary_visibility ON document_summaries FOR SELECT TO {READER_ROLE} USING (
+  EXISTS (SELECT 1 FROM documents d WHERE d.id = document_summaries.document_id)
+);
 """
 
 
@@ -289,6 +314,6 @@ def init_db() -> None:
 
 __all__ = [
     "JSON", "CLEARANCE", "AuditLog", "Base", "Chunk", "Conversation", "ConversationMessage",
-    "Document", "EvalRun", "Feedback", "READER_ROLE", "User",
+    "Document", "DocumentSummary", "EvalRun", "Feedback", "READER_ROLE", "User",
     "as_reader", "engine", "init_db", "session",
 ]

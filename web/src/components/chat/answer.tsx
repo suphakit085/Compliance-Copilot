@@ -4,7 +4,7 @@ import { useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  AlertTriangle, Ban, CheckCircle2, ChevronDown, CircleHelp, EyeOff, SearchX, ShieldAlert,
+  AlertTriangle, Ban, BookOpenText, CheckCircle2, ChevronDown, CircleHelp, EyeOff, SearchX, ShieldAlert,
   ThumbsDown, ThumbsUp,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -96,6 +96,21 @@ export function Answer({
           {md}
         </Markdown>
       </div>
+
+      {r.summary_hint && (
+        <a
+          href={`/documents?doc=${encodeURIComponent(r.summary_hint.document_id)}&view=summary`}
+          className="flex gap-2 rounded-lg border border-brand/40 bg-brand/5 px-3 py-2 text-sm transition hover:bg-brand/10"
+        >
+          <BookOpenText className="mt-0.5 size-4 shrink-0 text-brand" />
+          <span>
+            คำตอบนี้อ่านจากเพียง {r.sources.length} หน่วยที่เกี่ยวข้องที่สุด ไม่ใช่ทั้งฉบับ ({r.summary_hint.units} หน่วย) —{" "}
+            <span className="font-medium text-brand">
+              {r.summary_hint.has_summary ? "เปิดสรุปทั้งฉบับ" : "สร้างสรุปทั้งฉบับ"}ของ {r.summary_hint.title} →
+            </span>
+          </span>
+        </a>
+      )}
 
       {r.notices.map((n) => (
         <div key={n} className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
