@@ -269,7 +269,7 @@ def stream_answer(
 
     # 4. Abstain when the best evidence is weak - no LLM call, nothing to hallucinate from
     if retrieval.top_score < s.abstain_threshold:
-        resp = ChatResponse(status="insufficient_evidence", answer=NO_EVIDENCE, **{**base, "sources": []},
+        resp = ChatResponse(status="insufficient_evidence", answer=NO_EVIDENCE, **{**base, "sources": [], "notices": []},
                             trace={**trace, "abstained": True})
         yield {"type": "final", "response": _finish(resp, q, retrieval, None, started, user, log)}
         return
@@ -331,7 +331,8 @@ def stream_answer(
         src.quotes = [c.quote for c in report.citations if c.verified and c.source_id == src.id]
         src.cited = bool(src.quotes)
     status: Status = gen.status
-    answer = report.answer
+    # Thai has no sentence-final full stop; the model sometimes emits a CJK one ("[S1]。")
+    answer = report.answer.replace("。", "")
     if gen.status in ("answered", "partial") and not report.verified_sources:
         status = "unverified"
         answer = _retrieval_only_answer(

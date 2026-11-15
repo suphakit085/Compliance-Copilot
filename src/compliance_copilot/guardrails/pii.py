@@ -69,9 +69,17 @@ def _mask_thai_names(t: str, found: Counter) -> str:
     from pythainlp.tokenize import word_tokenize
 
     words = _thai_words()
+    # Word starts in the text: a title found inside a word is not a title ("มิถุนายน" contains
+    # "นาย"); "ลูกค้านายสมชาย" still splits as ลูกค้า|นาย|สมชาย.
+    starts, at = set(), 0
+    for w in word_tokenize(t, engine="newmm"):
+        starts.add(at)
+        at += len(w)
     out, pos = [], 0
     for m in _PERSON.finditer(t):
         title, first, last = m.group(1), m.group(2), m.group(3)
+        if m.start() not in starts:
+            continue
         w1 = word_tokenize(first, engine="newmm")[0]
         if title + w1 in words:
             continue

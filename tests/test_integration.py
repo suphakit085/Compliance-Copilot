@@ -73,6 +73,18 @@ def test_out_of_corpus_question_abstains_without_llm(corpus, fake_llm):
     assert fake_llm.calls == 0
 
 
+def test_an_abstained_answer_carries_no_notices_about_unshown_documents(corpus, fake_llm):
+    # found with a live run: a restaurant question came back with a ทธ. 35/2556 amendment warning
+    r = answer_question("แนะนำร้านอาหารญี่ปุ่นแถวสีลมหน่อย", EMPLOYEE, log=False)
+    assert r.status == "insufficient_evidence" and not r.sources and not r.notices
+
+
+def test_sanctions_list_wording_reaches_the_sanctions_policy_statement(corpus):
+    # staff say "sanctions list" / "บุคคลที่ถูกกำหนด"; the BOT-AMLO statement says "การคว่ำบาตร"
+    r = retrieve("ถ้าชื่อลูกค้าตรงกับรายชื่อบุคคลที่ถูกกำหนด (sanctions list) ต้องทำอย่างไร", EMPLOYEE)
+    assert "bot-amlo-sanctions-jps-2567" in _docs(r)
+
+
 def test_grounded_answer_has_verified_citation_and_masks_pii(corpus, fake_llm):
     r = answer_question("ลูกค้า นายสมชาย ใจดี โทร 081-234-5678 ต้องเก็บข้อมูล CDD กี่ปีหลังปิดบัญชี",
                         EMPLOYEE, log=False)

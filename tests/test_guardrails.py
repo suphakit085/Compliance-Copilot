@@ -19,6 +19,20 @@ def test_ordinary_words_with_title_prefix_are_not_names(text):
     assert not mask_pii(text).has_pii
 
 
+@pytest.mark.parametrize("text", [
+    "นโยบายของขวัญ ณ เดือนมิถุนายน 2567 รับได้เท่าไหร่",  # มิถุนายน contains "นาย"
+    "ประกาศมีผลตั้งแต่ 1 มิถุนายน 2565",
+])
+def test_titles_inside_a_word_are_not_names(text):
+    assert not mask_pii(text).has_pii
+
+
+@pytest.mark.parametrize("text", ["ลูกค้านายสมชาย ใจดี โอนเงิน", "ผู้รับโอนคือนายสมชาย ใจดี", "มีลูกค้าชื่อนางสมพร"])
+def test_names_right_after_another_word_are_still_masked(text):
+    r = mask_pii(text)
+    assert r.found["ชื่อบุคคล"] == 1 and "สม" not in r.text
+
+
 def test_bare_13_digits_need_valid_checksum():
     assert not mask_pii("ยอด 1234567890123 บาท").has_pii
     good = "110170020736" + str((11 - sum(int(d) * (13 - i) for i, d in enumerate("110170020736")) % 11) % 10)
