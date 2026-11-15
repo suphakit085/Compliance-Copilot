@@ -41,6 +41,17 @@ class FakeLLM:
                 citations=[prompts.CitedQuote(source_id=sid, quote=quote)], follow_up_questions=[],
             )
             return out, llm.Usage(self.model, 100, 20)
+        from compliance_copilot.features import doc_summary as ds
+
+        if schema is ds.SummaryOut:
+            # one point quoting the first unit verbatim, and one the verifier must throw away
+            m = re.search(r'<unit id="(U\d+)"[^>]*>(?:\n[^\n]*หมายเหตุ[^\n]*)*\n(.*?)\n</unit>', prompt, re.S)
+            uid, body = m.group(1), m.group(2)
+            return ds.SummaryOut(points=[
+                ds.PointOut(section="obligations", text="ประเด็นทดสอบ", citations=[ds.UnitQuote(unit_id=uid, quote=body[:60])]),
+                ds.PointOut(section="penalties", text="ประเด็นที่ไม่มีในต้นฉบับ",
+                            citations=[ds.UnitQuote(unit_id=uid, quote="ข้อความนี้ไม่มีอยู่ในเอกสารใดเลยแน่นอน")]),
+            ]), llm.Usage(self.model, 1000, 50)
         if schema is prompts.Standalone:
             return prompts.Standalone(question=prompt.rsplit("Latest message:", 1)[-1].strip()), llm.Usage(self.model)
         raise AssertionError(f"unexpected schema {schema}")

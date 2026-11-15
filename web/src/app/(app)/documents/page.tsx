@@ -5,6 +5,7 @@ import { ClipboardCheck, ExternalLink, FileScan, FlaskConical, Lock, Search, Sti
 import { api, type DocumentInfo, type Section } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/app-shell";
+import { DocumentSummary } from "@/components/document-summary";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,10 +16,24 @@ export default function DocumentsPage() {
   const [sections, setSections] = useState<Section[] | null>(null);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [view, setView] = useState<"summary" | "text">("text");
 
   useEffect(() => {
-    api<DocumentInfo[]>("/documents").then((d) => { setDocs(d); setActive(d[0]?.id ?? null); });
+    // /documents?doc=<id>&view=summary - the link the chat gives for "summarise this document"
+    const params = new URLSearchParams(window.location.search);
+    api<DocumentInfo[]>("/documents").then((d) => {
+      setDocs(d);
+      setActive(d.find((x) => x.id === params.get("doc"))?.id ?? d[0]?.id ?? null);
+      if (params.get("view") === "summary") setView("summary");
+    });
   }, []);
+
+  function openUnit(chunkId: string) {
+    setQ("");
+    setView("text");
+    setOpen(chunkId);
+    setTimeout(() => document.getElementById(`unit-${chunkId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+  }
   useEffect(() => {
     if (!active) return;
     let stale = false;
@@ -132,6 +147,24 @@ export default function DocumentsPage() {
                 </div>
               </div>
 
+              <div className="flex gap-1 border-b">
+                {([["text", "เนื้อหา"], ["summary", "สรุปใจความสำคัญ"]] as const).map(([k, label]) => (
+                  <button
+                    key={k}
+                    onClick={() => setView(k)}
+                    className={cn(
+                      "-mb-px border-b-2 px-3 py-2 text-sm transition",
+                      view === k ? "border-brand font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {view === "summary" && <DocumentSummary key={doc.id} doc={doc} onOpenUnit={openUnit} />}
+
+              {view === "text" && <>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาในเอกสารนี้ เช่น ระยะเวลา, ยินยอม, มาตรา 26" className="h-10 pl-9" />
@@ -140,7 +173,7 @@ export default function DocumentsPage() {
               <div className="divide-y panel">
                 {!sections && <div className="space-y-2 p-4">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10" />)}</div>}
                 {shown.map((s) => (
-                  <div key={s.id}>
+                  <div key={s.id} id={`unit-${s.id}`}>
                     <button onClick={() => setOpen(open === s.id ? null : s.id)} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted/50">
                       <span className="mt-0.5 shrink-0 rounded-md bg-brand/15 px-2 py-0.5 text-xs font-semibold text-[#4db8ff]">{s.label}</span>
                       <span className={cn("min-w-0 text-sm text-foreground/80", open !== s.id && "line-clamp-1")}>
@@ -161,6 +194,7 @@ export default function DocumentsPage() {
                 ))}
                 {sections && shown.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">ไม่พบข้อความที่ค้นหา</p>}
               </div>
+              </>}
             </div>
           )}
         </div>

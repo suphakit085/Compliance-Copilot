@@ -100,7 +100,40 @@ export interface ChatResponse {
     support_rate?: number; unsupported_markers?: string[];
   };
   trace: Record<string, unknown>;
+  /** Set when the question asked to summarise a whole document (the answer reads only a few units). */
+  summary_hint?: { document_id: string; title: string; units: number; has_summary: boolean } | null;
 }
+
+export interface DocSummary {
+  id: number;
+  document_id: string;
+  title: string;
+  points: {
+    section: string;
+    text: string;
+    citations: { unit: string; chunk_id: string; label: string; quote: string }[];
+  }[];
+  stats: { units: number; units_cited: number; points: number; parts: number; dropped_points: number; dropped_citations: number };
+  model: string | null;
+  prompt_version: string;
+  created_at: string;
+  created_by: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  stale: boolean;
+}
+
+export const SUMMARY_SECTIONS = [
+  { key: "overview", label: "ภาพรวม" },
+  { key: "scope", label: "ใช้กับใคร / ขอบเขต" },
+  { key: "obligations", label: "หน้าที่ที่ต้องปฏิบัติ" },
+  { key: "deadlines", label: "กรอบเวลาและตัวเลขสำคัญ" },
+  { key: "prohibitions", label: "ข้อห้าม" },
+  { key: "penalties", label: "บทลงโทษและผลของการไม่ปฏิบัติ" },
+  { key: "exceptions", label: "ข้อยกเว้น" },
+  { key: "effective", label: "วันมีผลและบทเฉพาะกาล" },
+] as const;
 
 export interface ConversationSummary {
   id: string;
