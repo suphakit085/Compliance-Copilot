@@ -5,26 +5,26 @@ description = "Trustworthy RAG assistant for Thai banking & securities complianc
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-    "anthropic>=0.60",
+    "anthropic>=2.10.0",
     "beautifulsoup4>=4.12",
-    "fastapi>=0.115",
+    "fastapi>=0.165.0",
     "google-genai>=1.0",
     "httpx>=0.27",
     "openpyxl>=3.1",
-    "pandas>=2.2",
+    "pandas>=3.1.1",
     "pgvector>=0.3",
     "psycopg[binary]>=3.2",
-    "pydantic>=2.8",
-    "pydantic-settings>=2.4",
+    "pydantic>=2.14.4",
+    "pydantic-settings>=2.16.3",
     "pyjwt>=2.9",
-    "pymupdf>=1.24",
+    "pymupdf>=2.1",
     "pythainlp>=5.0",
     "pyyaml>=6.0",
     "rich>=13.7",
-    "sentence-transformers>=3.0",
+    "sentence-transformers>=6.3.0",
     "torch>=2.6",
-    "sqlalchemy>=2.0",
-    "typer>=0.12",
+    "sqlalchemy>=2.1.9",
+    "typer>=0.29.2",
     "uvicorn[standard]>=0.30",
     "prometheus-client>=0.26.0",
 ]
@@ -33,7 +33,7 @@ dependencies = [
 copilot = "compliance_copilot.cli:app"
 
 [dependency-groups]
-dev = ["pytest>=8.3", "ruff>=0.6"]
+dev = ["pytest>=8.3", "ruff>=0.17.5"]
 
 [build-system]
 requires = ["hatchling"]
